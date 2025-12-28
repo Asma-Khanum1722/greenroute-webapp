@@ -1,9 +1,14 @@
 import { motion } from "framer-motion";
 import { Leaf, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "./ui/button";
 
-const navLinks = ["Live Map", "Routes", "Schedules"];
+const navLinks = [
+  { label: "Live Map", href: "/#live-map" },
+  { label: "Routes", href: "/routes" },
+  { label: "Schedules", href: "/routes#schedule" },
+];
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,23 +23,23 @@ export const Navbar = () => {
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2 group">
+          <Link to="/" className="flex items-center gap-2 group">
             <Leaf className="w-6 h-6 text-primary transition-transform group-hover:rotate-12" />
             <span className="font-display font-bold text-xl text-foreground tracking-tight">
               GreenRoute
             </span>
-          </a>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
-              <a
-                key={link}
-                href={`#${link.toLowerCase().replace(" ", "-")}`}
+              <Link
+                key={link.label}
+                to={link.href}
                 className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
               >
-                {link}
-              </a>
+                {link.label}
+              </Link>
             ))}
           </div>
 
@@ -70,14 +75,14 @@ export const Navbar = () => {
           >
             <div className="flex flex-col gap-4">
               {navLinks.map((link) => (
-                <a
-                  key={link}
-                  href={`#${link.toLowerCase().replace(" ", "-")}`}
+                <Link
+                  key={link.label}
+                  to={link.href}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setIsOpen(false)}
                 >
-                  {link}
-                </a>
+                  {link.label}
+                </Link>
               ))}
               <div className="flex flex-col gap-2 mt-4">
                 <Button
