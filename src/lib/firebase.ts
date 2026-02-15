@@ -7,6 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDwtQ7X3JWp3za5eqybo60Wq0jCMqGlkt0",
   authDomain: "greenroute-fyp.firebaseapp.com",
   projectId: "greenroute-fyp",
+  databaseURL: "https://greenroute-fyp-default-rtdb.firebaseio.com",
   storageBucket: "greenroute-fyp.firebasestorage.app",
   messagingSenderId: "955439154863",
   appId: "1:955439154863:web:aa4a25227670a5ac65b65a"

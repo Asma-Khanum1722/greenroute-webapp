@@ -45,12 +45,14 @@ export const Navbar = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Button
-              variant="ghost"
-              className="text-muted-foreground hover:text-foreground border border-foreground/10 rounded-full px-5"
-            >
-              Driver Login
-            </Button>
+            <Link to="/login">
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground border border-foreground/10 rounded-full px-5"
+              >
+                Driver Login
+              </Button>
+            </Link>
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 green-glow-subtle">
               Download App
             </Button>
@@ -85,12 +87,14 @@ export const Navbar = () => {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 mt-4">
-                <Button
-                  variant="ghost"
-                  className="border border-foreground/10 rounded-full"
-                >
-                  Driver Login
-                </Button>
+                <Link to="/login" onClick={() => setIsOpen(false)}>
+                  <Button
+                    variant="ghost"
+                    className="w-full border border-foreground/10 rounded-full"
+                  >
+                    Driver Login
+                  </Button>
+                </Link>
                 <Button className="bg-primary text-primary-foreground rounded-full green-glow-subtle">
                   Download App
                 </Button>

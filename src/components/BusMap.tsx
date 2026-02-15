@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { rtdb } from "@/lib/firebase";
+import { ref, onValue } from "firebase/database";
 
 // Fix for default marker icons in Leaflet with React
 // @ts-ignore
@@ -24,30 +26,33 @@ const stationIcon = new L.Icon({
   iconAnchor: [15, 30],
 });
 
+interface Bus {
+  id: string;
+  lat: number;
+  lng: number;
+  speed: number;
+  heading: number;
+  status: string;
+}
+
 interface BusMapProps {
   center?: [number, number];
   zoom?: number;
 }
 
 const BusMap = ({ center = [32.15, 72.8], zoom = 10 }: BusMapProps) => {
-  const [busPos, setBusPos] = useState<[number, number]>([32.0734, 72.7000]);
+  const [buses, setBuses] = useState<Record<string, Bus>>({});
   
-  // Simulation logic for moving the bus
   useEffect(() => {
-    const start: [number, number] = [32.0734, 72.7000]; // Chak 91
-    const end: [number, number] = [32.2647, 72.9056];   // Bhalwal
-    
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 0.01;
-      if (progress > 1) progress = 0;
-      
-      const newLat = start[0] + (end[0] - start[0]) * progress;
-      const newLng = start[1] + (end[1] - start[1]) * progress;
-      setBusPos([newLat, newLng]);
-    }, 1000);
-    
-    return () => clearInterval(interval);
+    const busesRef = ref(rtdb, "buses");
+    const unsubscribe = onValue(busesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setBuses(data);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -82,16 +87,20 @@ const BusMap = ({ center = [32.15, 72.8], zoom = 10 }: BusMapProps) => {
           <Popup>Bhalwal Station</Popup>
         </Marker>
 
-        {/* Moving Bus */}
-        <Marker position={busPos} icon={busIcon}>
-          <Popup>
-            <div className="text-sm font-medium">
-              <p className="text-primary">Electrical Bus E1</p>
-              <p>Status: On Route</p>
-              <p>Speed: 45 km/h</p>
-            </div>
-          </Popup>
-        </Marker>
+        {/* Live Buses */}
+        {Object.entries(buses).map(([key, bus]) => (
+          bus.status === "active" && (
+            <Marker key={key} position={[bus.lat, bus.lng]} icon={busIcon}>
+              <Popup>
+                <div className="text-sm font-medium">
+                  <p className="text-primary">Electrical Bus {bus.id}</p>
+                  <p>Status: On Route</p>
+                  <p>Speed: {Math.round(bus.speed * 3.6)} km/h</p>
+                </div>
+              </Popup>
+            </Marker>
+          )
+        ))}
       </MapContainer>
     </div>
   );
