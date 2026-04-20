@@ -1,5 +1,5 @@
 const { initializeApp } = require("firebase/app");
-const { getAuth, createUserWithEmailAndPassword, signOut } = require("firebase/auth");
+const { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updatePassword, signOut } = require("firebase/auth");
 const { getFirestore, doc, setDoc } = require("firebase/firestore");
 
 const firebaseConfig = {
@@ -19,49 +19,73 @@ const db = getFirestore(app);
 const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
 const createAccounts = async () => {
-  console.log("Starting Security Account Creation...");
+  console.log("Starting Security Resync & Password Update...");
 
-  // 1. Create Admin
+  // 1. Setup Admin
   const adminEmail = "admin@gmail.com";
   const adminPass = "admin123";
   
   try {
-    const adminCred = await createUserWithEmailAndPassword(auth, adminEmail, adminPass);
-    await setDoc(doc(db, "users", adminCred.user.uid), {
+    let user;
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, adminEmail, adminPass);
+      user = cred.user;
+    } catch (e) {
+      // If already exists, sign in to update profile/pass
+      const cred = await signInWithEmailAndPassword(auth, adminEmail, "admin123").catch(() => 
+        signInWithEmailAndPassword(auth, adminEmail, "Sargodha123!") // Try old pass if changed
+      );
+      user = cred.user;
+      await updatePassword(user, adminPass);
+    }
+
+    await setDoc(doc(db, "users", user.uid), {
       email: adminEmail,
       role: "admin",
-      name: "System Administrator",
+      name: "Sargodha Admin",
       createdAt: new Date().toISOString()
     });
-    console.log("✅ Admin Created: admin@gmail.com");
+    console.log("✅ Admin Ready: admin@gmail.com / admin123");
     await signOut(auth);
   } catch (e) {
-    console.log("⚠️ Admin already exists or error:", e.message);
+    console.log("⚠️ Admin Error:", e.message);
   }
 
-  // 2. Create 33 Drivers
+  // 2. Setup 33 Drivers
   for (let i = 1; i <= 33; i++) {
     const email = `driver${i}@greenroute.com`;
-    const pass = "Sargodha123!";
+    const newPass = `driver-e${i}`;
     
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await setDoc(doc(db, "users", cred.user.uid), {
+      let user;
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, newPass);
+        user = cred.user;
+      } catch (e) {
+        // Try to sign in with old pass to update
+        const cred = await signInWithEmailAndPassword(auth, email, "Sargodha123!").catch(() => 
+          signInWithEmailAndPassword(auth, email, newPass)
+        );
+        user = cred.user;
+        await updatePassword(user, newPass);
+      }
+
+      await setDoc(doc(db, "users", user.uid), {
         email: email,
         role: "driver",
         busId: `e${i}`,
-        name: `Bus Driver ${i}`,
+        name: `Driver of Bus E${i}`,
         createdAt: new Date().toISOString()
       });
-      console.log(`✅ Driver ${i} Created: ${email}`);
+      console.log(`✅ Driver ${i} Ready: ${email} / ${newPass}`);
       await signOut(auth);
-      await delay(500); // Small delay to avoid rate limiting
+      await delay(400); 
     } catch (e) {
-      console.log(`⚠️ Driver ${i} already exists or error:`, e.message);
+      console.log(`⚠️ Driver ${i} Error:`, e.message);
     }
   }
 
-  console.log("Done! Security System is now fully populated.");
+  console.log("Done! All profiles synced and passwords simplified.");
   process.exit(0);
 };
 

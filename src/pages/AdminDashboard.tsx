@@ -1,3 +1,5 @@
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { ShieldCheck, Bus, Activity, Users, Map as MapIcon, Database } from "lucide-react";
 import { motion } from "framer-motion";
 import BusMap from "@/components/BusMap";

@@ -38,22 +38,33 @@ interface Bus {
 interface BusMapProps {
   center?: [number, number];
   zoom?: number;
+  showInactive?: boolean;
+  className?: string;
 }
 
-const BusMap = ({ center = [32.15, 72.8], zoom = 10 }: BusMapProps) => {
-  const [buses, setBuses] = useState<Record<string, Bus>>({});
+const BusMap = ({ center = [32.15, 72.8], zoom = 10, showInactive = false }: BusMapProps) => {
+  const [buses, setBuses] = useState<Bus[]>([]);
   
   useEffect(() => {
     const busesRef = ref(rtdb, "buses");
     const unsubscribe = onValue(busesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        setBuses(data);
+        const busList = Object.entries(data).map(([key, value]: [string, any]) => ({
+          ...value,
+          key
+        }));
+        
+        const filteredBuses = showInactive 
+          ? busList 
+          : busList.filter((bus: Bus) => bus.status === "active");
+
+        setBuses(filteredBuses);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [showInactive]);
 
   return (
     <div className="h-[500px] w-full rounded-2xl overflow-hidden glass-card relative z-10 border border-primary/30 shadow-[0_0_50px_-12px_rgba(16,185,129,0.2)]">
@@ -88,18 +99,48 @@ const BusMap = ({ center = [32.15, 72.8], zoom = 10 }: BusMapProps) => {
         </Marker>
 
         {/* Live Buses */}
-        {Object.entries(buses).map(([key, bus]) => (
-          bus.status === "active" && (
-            <Marker key={key} position={[bus.lat, bus.lng]} icon={busIcon}>
-              <Popup>
-                <div className="text-sm font-medium">
-                  <p className="text-primary">Electrical Bus {bus.id}</p>
-                  <p>Status: On Route</p>
-                  <p>Speed: {Math.round(bus.speed * 3.6)} km/h</p>
+        {buses.map((bus) => (
+          <Marker 
+            key={bus.key} 
+            position={[bus.lat, bus.lng]}
+            icon={L.divIcon({
+              className: "custom-div-icon",
+              html: `<div style="
+                background-color: ${bus.status === 'active' ? '#10b981' : '#6b7280'};
+                padding: 8px;
+                border-radius: 50%;
+                border: 2px solid white;
+                box-shadow: 0 0 10px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 1.1.9 2 2 2h10"/>
+                  <circle cx="14" cy="17" r="3"/>
+                  <circle cx="6" cy="17" r="3"/>
+                </svg>
+              </div>`,
+              iconSize: [36, 36],
+              iconAnchor: [18, 18],
+            })}
+          >
+            <Popup className="custom-popup">
+              <div className="p-3">
+                <h3 className="font-bold text-lg mb-1">{bus.id}</h3>
+                <div className="space-y-1 text-sm">
+                  <p className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${bus.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                    Status: <span className="capitalize">{bus.status}</span>
+                  </p>
+                  {bus.driverName && (
+                    <p className="text-primary font-medium italic">Driver: {bus.driverName}</p>
+                  )}
+                  <p>Speed: {bus.speed} km/h</p>
                 </div>
-              </Popup>
-            </Marker>
-          )
+              </div>
+            </Popup>
+          </Marker>
         ))}
       </MapContainer>
     </div>

@@ -3,13 +3,14 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import RoutesSchedules from "./pages/RoutesSchedules";
-import Auth from "./pages/Auth";
-import AdminDashboard from "./pages/AdminDashboard";
-import DriverDashboard from "./pages/DriverDashboard";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import NotFound from "./pages/NotFound";
+import Index from "@/pages/Index";
+import RoutesSchedules from "@/pages/RoutesSchedules";
+import Auth from "@/pages/Auth";
+import AdminDashboard from "@/pages/AdminDashboard";
+import DriverDashboard from "@/pages/DriverDashboard";
+import PassengerDashboard from "@/pages/PassengerDashboard";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,14 @@ const App = () => (
             element={
               <ProtectedRoute allowedRole="driver">
                 <DriverDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/passenger" 
+            element={
+              <ProtectedRoute allowedRole="passenger">
+                <PassengerDashboard />
               </ProtectedRoute>
             } 
           />

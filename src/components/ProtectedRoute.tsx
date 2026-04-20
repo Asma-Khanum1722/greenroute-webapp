@@ -6,7 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRole?: "admin" | "driver";
+  allowedRole?: "admin" | "driver" | "passenger";
 }
 
 export const ProtectedRoute = ({ children, allowedRole }: ProtectedRouteProps) => {
@@ -47,8 +47,12 @@ export const ProtectedRoute = ({ children, allowedRole }: ProtectedRouteProps) =
   }
 
   if (allowedRole && userRole !== allowedRole) {
-    // If user is a driver trying to access admin, or vice versa
-    return <Navigate to={userRole === "admin" ? "/admin" : "/driver"} replace />;
+    const redirectMap: Record<string, string> = {
+      admin: "/admin",
+      driver: "/driver",
+      passenger: "/passenger"
+    };
+    return <Navigate to={redirectMap[userRole || ""] || "/login"} replace />;
   }
 
   return <>{children}</>;
