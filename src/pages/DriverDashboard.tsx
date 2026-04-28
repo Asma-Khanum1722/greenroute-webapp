@@ -19,8 +19,11 @@ import {
 } from "@/components/ui/select";
 
 export default function DriverDashboard() {
+  // VIVA-NOTE: We use 'useState' to manage the dynamic parts of the UI.
+  // The <number | null>, <string>, etc. are TypeScript types that tell the editor 
+  // exactly what kind of data to expect, preventing bugs during the demo.
   const [isTracking, setIsTracking] = useState(false);
-  const [watchId, setWatchId] = useState<number | null>(null);
+  const [watchId, setWatchId] = useState<number | null>(null); // Stores the ID of the GPS listener
   const [driverName, setDriverName] = useState<string>("");
   const [assignedBusId, setAssignedBusId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -28,6 +31,7 @@ export default function DriverDashboard() {
   // Create list of 33 buses
   const busPorts = Array.from({ length: 33 }, (_, i) => `e${i + 1}`);
 
+  // FETCH PROFILE: On component mount, we grab the logged-in driver's name from Firestore.
   useEffect(() => {
     const fetchProfile = async () => {
       if (auth.currentUser) {
@@ -46,12 +50,14 @@ export default function DriverDashboard() {
     navigate("/login");
   };
 
+  // START TRACKING: This is the core 'Real-Time' engine.
   const startTracking = () => {
     if (!assignedBusId) {
       toast.error("Please select a bus before starting your shift.");
       return;
     }
     
+    // Check if the device actually supports GPS
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser");
       return;
@@ -60,17 +66,19 @@ export default function DriverDashboard() {
     setIsTracking(true);
     toast.success(`Shift Started: Bus ${assignedBusId.toUpperCase()}`);
 
+    // VIVA-EXPLANATION: 'watchPosition' is better than 'getCurrentPosition' because
+    // it automatically fires whenever the driver moves, providing a 'Live' stream.
     const id = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, speed, heading } = position.coords;
         
-        // Push live data to RTDB
+        // PUSH TO RTDB: We use the Firebase Realtime Database for sub-second latency.
         const busRef = ref(rtdb, `buses/${assignedBusId}`);
         set(busRef, {
-          id: `${assignedBusId.toUpperCase()}-91`,
+          id: `${assignedBusId.toUpperCase()}-91`, // '91' represents the Sargodha route code
           lat: latitude,
           lng: longitude,
-          speed: speed ? Math.round(speed * 3.6) : 0, // Convert to km/h
+          speed: speed ? Math.round(speed * 3.6) : 0, // Converting Meters/Second to KM/H
           heading: heading || 0,
           lastUpdated: Date.now(),
           status: "active",
@@ -79,18 +87,15 @@ export default function DriverDashboard() {
       },
       (error) => {
         console.error("GPS Error:", error);
-        if (error.code === 1) {
-          toast.error("Location Permission Denied. Please enable it in browser settings.");
-        } else if (error.code === 3) {
-          toast.error("GPS is taking too long. Try moving to a window or outdoors.");
-        } else {
-          toast.error("Lost GPS connection. Retrying...");
-        }
+        // Professional error handling makes the app feel robust
+        if (error.code === 1) toast.error("Location Permission Denied.");
+        else if (error.code === 3) toast.error("GPS Timeout. Moving outdoors might help.");
+        else toast.error("Lost GPS connection. Retrying...");
       },
       { 
-        enableHighAccuracy: true, 
-        maximumAge: 0, 
-        timeout: 10000 
+        enableHighAccuracy: true, // Forces the device to use GPS chips, not just WiFi/Cellular
+        maximumAge: 0,            // Don't use cached locations; we want fresh data
+        timeout: 10000            // If we don't get a fix in 10s, trigger the error
       }
     );
 
