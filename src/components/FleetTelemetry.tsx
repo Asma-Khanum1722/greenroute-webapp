@@ -1,0 +1,116 @@
+import { useEffect, useState } from "react";
+import { rtdb } from "@/lib/firebase";
+import { ref, onValue } from "firebase/database";
+import { motion, AnimatePresence } from "framer-motion";
+import { Bus, User, Navigation, Gauge, Activity } from "lucide-react";
+
+interface BusData {
+  id: string;
+  lat: number;
+  lng: number;
+  speed: number;
+  status: string;
+  driverName?: string;
+  lastUpdated: number;
+}
+
+export default function FleetTelemetry() {
+  const [buses, setBuses] = useState<BusData[]>([]);
+
+  // VIVA-EXPLANATION: We use 'onValue' to create a real-time listener.
+  // This is much more efficient than 'polling' the database every few seconds.
+  useEffect(() => {
+    const busesRef = ref(rtdb, "buses");
+    const unsubscribe = onValue(busesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const busList = Object.entries(data).map(([_, value]: [string, any]) => ({
+          ...value
+        }));
+        // Sort by ID to keep the table stable
+        setBuses(busList.sort((a, b) => a.id.localeCompare(b.id)));
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  return (
+    <div className="glass-card overflow-hidden border-primary/20">
+      <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
+        <h3 className="font-display font-bold flex items-center gap-2">
+          <Gauge className="w-5 h-5 text-primary" />
+          Live Fleet Telemetry
+        </h3>
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-tighter">
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          Real-Time Data Stream Active
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead className="text-xs uppercase text-muted-foreground bg-white/5">
+            <tr>
+              <th className="px-6 py-4 font-medium">Vehicle ID</th>
+              <th className="px-6 py-4 font-medium">Driver</th>
+              <th className="px-6 py-4 font-medium">Speed</th>
+              <th className="px-6 py-4 font-medium">Status</th>
+              <th className="px-6 py-4 font-medium text-right">Last Signal</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            <AnimatePresence mode="popLayout">
+              {buses.map((bus) => (
+                <motion.tr 
+                  key={bus.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="hover:bg-white/5 transition-colors group"
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+                        <Bus className="w-4 h-4 text-primary" />
+                      </div>
+                      <span className="font-bold text-white">{bus.id}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 text-muted-foreground group-hover:text-white transition-colors">
+                      <User className="w-3 h-3" />
+                      <span className="text-sm">{bus.driverName || "System Auto"}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className={`flex items-center gap-2 font-mono font-bold ${bus.speed > 60 ? 'text-destructive animate-pulse' : 'text-primary'}`}>
+                      <Navigation className="w-3 h-3 rotate-45" />
+                      {bus.speed} <span className="text-[10px] opacity-50">KM/H</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${bus.status === 'active' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
+                      {bus.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right font-mono text-[10px] text-muted-foreground">
+                    {Math.floor((Date.now() - bus.lastUpdated) / 1000)}s ago
+                  </td>
+                </motion.tr>
+              ))}
+            </AnimatePresence>
+          </tbody>
+        </table>
+      </div>
+      
+      {buses.length === 0 && (
+        <div className="p-12 text-center text-muted-foreground">
+          <Activity className="w-12 h-12 mx-auto mb-4 opacity-20" />
+          <p>Waiting for live fleet signals...</p>
+          <p className="text-xs opacity-50 mt-1">Start a driver shift to see live data</p>
+        </div>
+      )}
+    </div>
+  );
+}
