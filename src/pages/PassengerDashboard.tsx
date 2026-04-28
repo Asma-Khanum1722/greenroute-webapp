@@ -10,12 +10,15 @@ import { rtdb, auth, db } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
+import { SARGODHA_ROUTES } from "@/lib/routes";
 
 export default function PassengerDashboard() {
   const [userName, setUserName] = useState("");
   const [activeBuses, setActiveBuses] = useState(0);
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<string>("all");
+  const [targetStop, setTargetStop] = useState<any>(null);
 
   // Haversine formula to calculate distance in km
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -56,14 +59,18 @@ export default function PassengerDashboard() {
         setActiveBuses(activeCount);
 
         // Check proximity for active buses if enabled
-        if (isNotificationsEnabled && userLocation) {
+        if (isNotificationsEnabled && targetStop) {
           busList.forEach(bus => {
             if (bus.status === "active") {
-              const dist = calculateDistance(userLocation[0], userLocation[1], bus.lat, bus.lng);
-              if (dist < 1.5) {
+              const dist = calculateDistance(targetStop.lat, targetStop.lng, bus.lat, bus.lng);
+              // Alert when within 500m (0.5km)
+              if (dist < 0.5) {
                 new Notification("GreenRoute Alert 🚌", {
-                  body: `Bus ${bus.id} is only ${dist.toFixed(1)}km away! Head to the stop.`,
+                  body: `Bus ${bus.id} is arriving at ${targetStop.name} soon!`,
                   icon: "/favicon.ico"
+                });
+                toast.success(`Bus ${bus.id} is approaching your stop!`, {
+                  icon: "🚌",
                 });
                 // Disable to prevent spamming
                 setIsNotificationsEnabled(false); 
@@ -98,7 +105,7 @@ export default function PassengerDashboard() {
       <Navbar />
       
       <div className="pt-24 pb-12 container mx-auto px-6">
-        <header className="mb-10">
+        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -106,6 +113,22 @@ export default function PassengerDashboard() {
             <h1 className="text-4xl font-display font-bold">Welcome, {userName || "Passenger"}</h1>
             <p className="text-muted-foreground mt-2 font-medium">Your Sargodha Smart Transit Portal is active.</p>
           </motion.div>
+          
+          <div className="flex flex-col gap-2 w-full md:w-72">
+            <label className="text-xs font-bold uppercase tracking-widest text-primary">Live Route Filter</label>
+            <select 
+              value={selectedRoute}
+              onChange={(e) => setSelectedRoute(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-sm focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer hover:bg-white/10"
+            >
+              <option value="all" className="bg-[#0A0A0A]">All Active Routes</option>
+              {SARGODHA_ROUTES.map(route => (
+                <option key={route.id} value={route.id} className="bg-[#0A0A0A]">
+                  {route.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -118,7 +141,14 @@ export default function PassengerDashboard() {
                   <span className="text-xs font-bold uppercase tracking-wider">{activeBuses} Buses Active</span>
                 </div>
               </div>
-              <BusMap className="h-[600px] rounded-xl border-none" />
+              <BusMap 
+                className="h-[600px] rounded-xl border-none" 
+                selectedRoute={selectedRoute} 
+                onSelectStop={(stop) => {
+                  setTargetStop(stop);
+                  toast.info(`Target Stop set to: ${stop.name}`);
+                }}
+              />
             </section>
           </div>
 
@@ -144,8 +174,13 @@ export default function PassengerDashboard() {
                   className={`w-full gap-2 font-bold h-12 rounded-xl transition-all ${isNotificationsEnabled ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-primary hover:bg-primary/90'}`}
                 >
                   <Navigation className="w-4 h-4" />
-                  {isNotificationsEnabled ? "ALERTS ACTIVE" : "ENABLE PROXIMITY ALERTS"}
+                  {isNotificationsEnabled ? (targetStop ? `MONITORING: ${targetStop.name}` : "SELECT A STOP ON MAP") : "ENABLE PROXIMITY ALERTS"}
                 </Button>
+                {targetStop && (
+                  <p className="text-[10px] text-primary text-center font-bold animate-pulse">
+                    Watching for buses near {targetStop.name}...
+                  </p>
+                )}
               </CardContent>
             </Card>
 

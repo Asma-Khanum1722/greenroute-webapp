@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { rtdb } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
+import { SARGODHA_ROUTES } from "@/lib/routes";
 
 // Fix for default marker icons in Leaflet with React
 // @ts-ignore
@@ -33,6 +34,9 @@ interface Bus {
   speed: number;
   heading: number;
   status: string;
+  routeId?: string;
+  key?: string;
+  driverName?: string;
 }
 
 interface BusMapProps {
@@ -40,11 +44,18 @@ interface BusMapProps {
   zoom?: number;
   showInactive?: boolean;
   className?: string;
+  selectedRoute?: string;
+  onSelectStop?: (stop: any) => void;
 }
 
-const BusMap = ({ center = [32.15, 72.8], zoom = 10, showInactive = false }: BusMapProps) => {
+const BusMap = ({ 
+  center = [32.074, 72.686], 
+  zoom = 13, 
+  showInactive = false, 
+  selectedRoute = "all",
+  onSelectStop
+}: BusMapProps) => {
   const [buses, setBuses] = useState<Bus[]>([]);
-  
   useEffect(() => {
     const busesRef = ref(rtdb, "buses");
     const unsubscribe = onValue(busesRef, (snapshot) => {
@@ -54,17 +65,40 @@ const BusMap = ({ center = [32.15, 72.8], zoom = 10, showInactive = false }: Bus
           ...value,
           key
         }));
-        
-        const filteredBuses = showInactive 
-          ? busList 
-          : busList.filter((bus: Bus) => bus.status === "active");
-
-        setBuses(filteredBuses);
+        setBuses(busList);
       }
     });
 
     return () => unsubscribe();
-  }, [showInactive]);
+  }, [showInactive, selectedRoute]);
+
+  const activeRoute = SARGODHA_ROUTES.find(r => r.id === selectedRoute);
+  
+  const filteredBuses = buses.filter(bus => {
+    if (selectedRoute === "all") return true;
+    // For demo purposes, if routeId isn't set, we show it on Route 91
+    return (bus.routeId || "91") === selectedRoute;
+  });
+
+  // Calculate ETA to the last stop of the route
+  const calculateETA = (bus: Bus) => {
+    if (!activeRoute || bus.speed <= 5) return "Calculating...";
+    const lastStop = activeRoute.stops[activeRoute.stops.length - 1];
+    
+    // Simple Haversine (re-implemented here for standalone component)
+    const R = 6371; 
+    const dLat = (lastStop.lat - bus.lat) * Math.PI / 180;
+    const dLon = (lastStop.lng - bus.lng) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(bus.lat * Math.PI / 180) * Math.cos(lastStop.lat * Math.PI / 180) * 
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+    
+    const timeHours = distance / bus.speed;
+    const timeMinutes = Math.round(timeHours * 60);
+    return `${timeMinutes} mins`;
+  };
 
   return (
     <div className="h-[500px] w-full rounded-2xl overflow-hidden glass-card relative z-10 border border-primary/30 shadow-[0_0_50px_-12px_rgba(16,185,129,0.2)]">
@@ -82,38 +116,51 @@ const BusMap = ({ center = [32.15, 72.8], zoom = 10, showInactive = false }: Bus
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        {/* Route Line */}
-        <Polyline 
-          positions={[[32.0734, 72.7000], [32.2647, 72.9056]]} 
-          color="#10b981" 
-          weight={4} 
-          dashArray="10, 10"
-        />
+        {/* Active Route Polyline */}
+        {activeRoute && (
+          <Polyline 
+            positions={activeRoute.stops.map(s => [s.lat, s.lng] as [number, number])} 
+            color={activeRoute.color} 
+            weight={6} 
+            opacity={0.6}
+            dashArray="12, 12"
+          />
+        )}
 
-        {/* Stations */}
-        <Marker position={[32.0734, 72.7000]} icon={stationIcon}>
-          <Popup>Chak 91 Terminal (Main)</Popup>
-        </Marker>
-        <Marker position={[32.2647, 72.9056]} icon={stationIcon}>
-          <Popup>Bhalwal Station</Popup>
-        </Marker>
+        {/* Stations / Stops */}
+        {(activeRoute ? activeRoute.stops : SARGODHA_ROUTES[0].stops).map((stop) => (
+          <Marker key={stop.id} position={[stop.lat, stop.lng]} icon={stationIcon}>
+            <Popup>
+              <div className="p-2 space-y-2">
+                <div className="font-bold border-b border-primary/20 pb-1">{stop.name}</div>
+                <button 
+                  className="w-full text-[10px] h-7 bg-primary text-black font-bold rounded hover:bg-primary/90 transition-colors"
+                  onClick={() => onSelectStop && onSelectStop(stop)}
+                >
+                  SET AS MY STOP
+                </button>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
 
         {/* Live Buses */}
-        {buses.map((bus) => (
+        {filteredBuses.map((bus) => (
           <Marker 
             key={bus.key} 
             position={[bus.lat, bus.lng]}
             icon={L.divIcon({
               className: "custom-div-icon",
               html: `<div style="
-                background-color: ${bus.status === 'active' ? '#10b981' : '#6b7280'};
+                background-color: ${activeRoute?.color || '#10b981'};
                 padding: 8px;
                 border-radius: 50%;
                 border: 2px solid white;
-                box-shadow: 0 0 10px rgba(0,0,0,0.3);
+                box-shadow: 0 0 15px ${activeRoute?.color || '#10b981'}80;
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                transition: all 0.5s ease;
               ">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 1.1.9 2 2 2h10"/>
@@ -126,17 +173,24 @@ const BusMap = ({ center = [32.15, 72.8], zoom = 10, showInactive = false }: Bus
             })}
           >
             <Popup className="custom-popup">
-              <div className="p-3">
-                <h3 className="font-bold text-lg mb-1">{bus.id}</h3>
-                <div className="space-y-1 text-sm">
-                  <p className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${bus.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-                    Status: <span className="capitalize">{bus.status}</span>
-                  </p>
-                  {bus.driverName && (
-                    <p className="text-primary font-medium italic">Driver: {bus.driverName}</p>
-                  )}
-                  <p>Speed: {bus.speed} km/h</p>
+              <div className="p-3 w-48">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-lg">{bus.id}</h3>
+                  <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">LIVE</span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Route:</span>
+                    <span className="text-white font-medium">{activeRoute?.name.split(':')[0] || "Route 91"}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Next Stop:</span>
+                    <span className="text-white font-medium">{activeRoute?.stops[activeRoute.stops.length-1].name || "Company Bagh"}</span>
+                  </div>
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                    <span className="text-primary font-bold">ETA:</span>
+                    <span className="text-xl font-display font-bold text-primary">{calculateETA(bus)}</span>
+                  </div>
                 </div>
               </div>
             </Popup>
