@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from "react";
 import { Leaf, Clock, MapPin } from "lucide-react";
 
 const AnimatedCounter = ({ end, duration = 2 }: { end: number; duration?: number }) => {
-  const [count, setCount] = useState(0);
+  const [count, setCount] = useState<number>(0);
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
 
