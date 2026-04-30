@@ -1,97 +1,67 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Bus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "./ui/button";
-import heroBg from "@/assets/hero-bg.jpg";
 
 export const HeroSection = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background Image */}
+    <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-[#020617]">
+      {/* Official Fleet Background Image */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${heroBg})` }}
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
+        style={{ 
+          backgroundImage: `url('/electric buses sargodha 1.jpg')`,
+        }}
       />
 
-      {/* Noise Overlay */}
-      <div className="absolute inset-0 noise-overlay pointer-events-none" />
+      {/* Overlays */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background/20 to-background z-0" />
+      <div className="absolute inset-0 noise-overlay opacity-5 pointer-events-none z-0" />
 
-      {/* Vignette Overlay */}
-      <div className="absolute inset-0 vignette pointer-events-none" />
-
-      {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/40 to-background" />
-
-      {/* Content */}
-      <div className="relative z-10 container mx-auto px-6 text-center">
-        {/* Badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="inline-flex items-center gap-2 glass-card px-4 py-2 mb-8"
-        >
-          <Bus className="w-4 h-4 text-primary" />
-          <span className="text-sm text-muted-foreground">
-            New Fleet |{" "}
-            <span className="text-primary font-semibold">33 Buses Active</span>
-          </span>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h1
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-foreground leading-tight tracking-tight mb-6"
-        >
-          Sargodha Moves with{" "}
-          <span className="text-gradient-green">GreenRoute</span>
-        </motion.h1>
-
-        {/* Subheadline */}
-        <motion.p
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed"
-        >
-          Real-time tracking for the University Road to Company Bagh route.{" "}
-          <span className="text-foreground">Zero uncertainty.</span>
-        </motion.p>
-
-        {/* CTA Button */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <Button
-            size="lg"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8 py-6 text-lg font-semibold green-glow transition-all duration-300 hover:shadow-[0_0_60px_rgba(0,166,81,0.5)]"
+      {/* Main Content - Massive vertical padding */}
+      <div className="relative z-20 container mx-auto px-6 pt-48 pb-32">
+        <div className="flex flex-col items-center text-center max-w-4xl mx-auto">
+          {/* Refined Headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white leading-[1.2] tracking-tight mb-8"
           >
-            Track My Bus Now
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
-        </motion.div>
+            Sargodha Moves with <br />
+            <span className="text-gradient-green italic">GreenRoute.</span>
+          </motion.h1>
 
-        {/* Scroll Indicator */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2"
-        >
+          {/* Refined Subheadline */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="text-sm sm:text-base text-muted-foreground max-w-xl mb-12 leading-relaxed opacity-70"
+          >
+            The division's first fully electric transit network. 
+            Real-time tracking for every bus, every stop, every day.
+          </motion.p>
+
+          {/* CTA */}
           <motion.div
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className="w-6 h-10 rounded-full border-2 border-foreground/20 flex items-start justify-center p-2"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
           >
-            <div className="w-1.5 h-3 bg-primary rounded-full" />
+            <Button
+              size="lg"
+              className="bg-primary hover:bg-primary/90 text-black rounded-full px-12 py-8 text-lg font-bold uppercase tracking-widest transition-all duration-500"
+              onClick={() => document.getElementById('live-map')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              Live Fleet Map
+              <ArrowRight className="w-6 h-6 ml-3" />
+            </Button>
           </motion.div>
-        </motion.div>
+        </div>
       </div>
+
+      {/* Bottom Fade */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent z-10" />
     </section>
   );
 };
