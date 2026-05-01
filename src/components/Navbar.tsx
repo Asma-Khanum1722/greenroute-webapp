@@ -1,108 +1,123 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Leaf, Menu, X } from "lucide-react";
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 
 const navLinks = [
-  { label: "Live Map", href: "/#live-map" },
+  { label: "Map", href: "/#live-map" },
   { label: "Routes", href: "/routes" },
   { label: "Schedules", href: "/routes#schedule" },
 ];
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Show/Hide Logic
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        setIsVisible(false);
+      } else {
+        setIsVisible(true);
+      }
+      
+      // Transparency Logic
+      setIsScrolled(currentScrollY > 50);
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
 
   return (
     <motion.nav
-      initial={{ y: -100, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.8, ease: "easeOut" }}
-      className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/30 border-b border-foreground/5"
+      initial={{ y: 0 }}
+      animate={{ y: isVisible ? 0 : -100 }}
+      transition={{ duration: 0.4, ease: "easeInOut" }}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled 
+          ? "py-3 backdrop-blur-xl bg-background/90 border-b border-white/5" 
+          : "py-5 bg-transparent"
+      }`}
     >
-      <div className="container mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <Leaf className="w-6 h-6 text-primary transition-transform group-hover:rotate-12" />
-            <span className="font-display font-bold text-xl text-foreground tracking-tight">
-              GreenRoute
+      <div className="container mx-auto px-6">
+        <div className="relative flex items-center justify-between">
+          {/* Logo - Aligned Left */}
+          <Link to="/" className="flex items-center gap-2 z-10">
+            <Leaf className="w-5 h-5 text-primary" />
+            <span className="font-display font-bold text-lg text-white">
+              Green<span className="text-primary">Route</span>
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          {/* Centered Links - Mathematically Centered */}
+          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-10">
             {navLinks.map((link) => (
               <Link
                 key={link.label}
                 to={link.href}
-                className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                className="text-sm font-medium text-white/50 hover:text-primary transition-colors"
               >
                 {link.label}
               </Link>
             ))}
           </div>
 
-          {/* CTA Buttons */}
-          <div className="hidden md:flex items-center gap-3">
-            <Link to="/login">
-              <Button
-                variant="ghost"
-                className="text-muted-foreground hover:text-foreground border border-foreground/10 rounded-full px-5"
-              >
-                Driver Login
+          {/* CTAs - Aligned Right */}
+          <div className="hidden md:flex items-center gap-6 z-10">
+            <Link to="/login?portal=driver">
+              <span className="text-xs font-medium text-white/40 hover:text-white transition-colors cursor-pointer">
+                Driver
+              </span>
+            </Link>
+            <Link to="/login?portal=passenger">
+              <Button size="sm" className="bg-primary hover:bg-emerald-500 text-black font-bold px-5 rounded-full h-9">
+                Passenger Portal
               </Button>
             </Link>
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 green-glow-subtle">
-              Download App
-            </Button>
           </div>
 
-          {/* Mobile Menu Toggle */}
+          {/* Mobile Menu */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden text-foreground"
+            className="md:hidden text-white z-10"
           >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
-
-        {/* Mobile Menu */}
+      </div>
+      
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden mt-4 pb-4 border-t border-foreground/5 pt-4"
+            className="md:hidden bg-background/95 backdrop-blur-xl border-b border-white/5"
           >
-            <div className="flex flex-col gap-4">
+            <div className="container mx-auto px-6 py-6 flex flex-col gap-6">
               {navLinks.map((link) => (
                 <Link
                   key={link.label}
                   to={link.href}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm font-medium text-white/60"
                   onClick={() => setIsOpen(false)}
                 >
                   {link.label}
                 </Link>
               ))}
-              <div className="flex flex-col gap-2 mt-4">
-                <Link to="/login" onClick={() => setIsOpen(false)}>
-                  <Button
-                    variant="ghost"
-                    className="w-full border border-foreground/10 rounded-full"
-                  >
-                    Driver Login
-                  </Button>
-                </Link>
-                <Button className="bg-primary text-primary-foreground rounded-full green-glow-subtle">
-                  Download App
-                </Button>
-              </div>
             </div>
           </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </motion.nav>
   );
 };
