@@ -19,6 +19,8 @@ export default function PassengerDashboard() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<string>("all");
   const [targetStop, setTargetStop] = useState<any>(null);
+  const [liveBuses, setLiveBuses] = useState<any[]>([]);
+  const [calcETA, setCalcETA] = useState<((bus: any) => string) | null>(null);
 
   // Haversine formula to calculate distance in km
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -34,10 +36,10 @@ export default function PassengerDashboard() {
   };
 
   useEffect(() => {
-    // 1. Get User Initial Location
-    navigator.geolocation.getCurrentPosition((pos) => {
+    // 1. Get Passenger's Real GPS Location (and keep watching it)
+    const geoWatchId = navigator.geolocation.watchPosition((pos) => {
       setUserLocation([pos.coords.latitude, pos.coords.longitude]);
-    });
+    }, null, { enableHighAccuracy: true });
 
     // 2. Fetch User Profile
     const fetchProfile = async () => {
@@ -58,32 +60,39 @@ export default function PassengerDashboard() {
         const activeCount = busList.filter((b: any) => b.status === "active").length;
         setActiveBuses(activeCount);
 
-        // Check proximity for active buses if enabled
-        if (isNotificationsEnabled && targetStop) {
-          busList.forEach(bus => {
-            if (bus.status === "active") {
-              const dist = calculateDistance(targetStop.lat, targetStop.lng, bus.lat, bus.lng);
-              // Alert when within 500m (0.5km)
-              if (dist < 0.5) {
-                new Notification("GreenRoute Alert 🚌", {
-                  body: `Bus ${bus.id} is arriving at ${targetStop.name} soon!`,
-                  icon: "/favicon.ico"
-                });
-                toast.success(`Bus ${bus.id} is approaching your stop!`, {
-                  icon: "🚌",
-                });
-                // Disable to prevent spamming
-                setIsNotificationsEnabled(false); 
+        // PROXIMITY CHECK:
+        // We check against the passenger's REAL GPS location — this means the alert
+        // fires when any active bus gets within 500m of wherever the passenger is standing.
+        // Works anywhere — university, street, market — no hardcoded stops needed.
+        if (isNotificationsEnabled) {
+          setUserLocation(currentLoc => {
+            if (!currentLoc) return currentLoc;
+            busList.forEach(bus => {
+              if (bus.status === "active") {
+                const dist = calculateDistance(currentLoc[0], currentLoc[1], bus.lat, bus.lng);
+                // 500m threshold
+                if (dist < 0.5) {
+                  new Notification("GreenRoute Alert 🚌", {
+                    body: `Bus ${bus.id} is only ${Math.round(dist * 1000)}m away — head to your stop!`,
+                    icon: "/favicon.ico"
+                  });
+                  toast.success(`Bus ${bus.id} is ${Math.round(dist * 1000)}m away!`, { icon: "🚌" });
+                  setIsNotificationsEnabled(false); // prevent spam
+                }
               }
-            }
+            });
+            return currentLoc;
           });
         }
       }
     });
 
     fetchProfile();
-    return () => unsub();
-  }, [isNotificationsEnabled, userLocation]);
+    return () => {
+      unsub();
+      navigator.geolocation.clearWatch(geoWatchId);
+    };
+  }, [isNotificationsEnabled]);
 
   const requestNotificationPermission = async () => {
     if (!("Notification" in window)) {
@@ -124,7 +133,7 @@ export default function PassengerDashboard() {
               <option value="all" className="bg-[#0A0A0A]">All Active Routes</option>
               {SARGODHA_ROUTES.map(route => (
                 <option key={route.id} value={route.id} className="bg-[#0A0A0A]">
-                  {route.name}
+                  {route.name} ({route.busCount} buses)
                 </option>
               ))}
             </select>
@@ -143,10 +152,15 @@ export default function PassengerDashboard() {
               </div>
               <BusMap 
                 className="h-[600px] rounded-xl border-none" 
-                selectedRoute={selectedRoute} 
+                selectedRoute={selectedRoute}
+                targetStop={targetStop}
                 onSelectStop={(stop) => {
                   setTargetStop(stop);
                   toast.info(`Target Stop set to: ${stop.name}`);
+                }}
+                onBusesUpdate={(buses, eta) => {
+                  setLiveBuses(buses);
+                  setCalcETA(() => eta);
                 }}
               />
             </section>
@@ -154,6 +168,49 @@ export default function PassengerDashboard() {
 
           {/* Sidebar Tools */}
           <div className="space-y-6">
+            {/* Live ETA Panel */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Clock className="w-4 h-4 text-primary" />
+                  Live ETA
+                  {selectedRoute !== "all" && (
+                    <span className="text-xs text-primary/60 font-normal ml-auto">
+                      {liveBuses.filter(b => b.status === "active").length} buses active
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {selectedRoute === "all" ? (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    Select a route from the dropdown above to see live ETAs
+                  </p>
+                ) : liveBuses.filter(b => b.status === "active").length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    No active buses on this route right now
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {liveBuses
+                      .filter(b => b.status === "active")
+                      .slice(0, 6)
+                      .map((bus) => (
+                        <div key={bus.key} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                            <span className="text-xs font-bold text-white">{bus.id}</span>
+                          </div>
+                          <span className="text-sm font-display font-bold text-primary">
+                            {calcETA ? calcETA(bus) : "..."}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Quick Alert Card */}
             <Card className="border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors duration-500 overflow-hidden relative group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -194,15 +251,18 @@ export default function PassengerDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {[
-                  { name: "Sargodha General Bus Stand", time: "Every 15m" },
-                  { name: "University Road Stop", time: "Every 20m" },
-                  { name: "Satellite Town Terminal", time: "Every 10m" }
+                  { name: "Chak 91 / General Bus Stand", detail: "Main Origin Hub — All Routes" },
+                  { name: "Bhalwal Terminal", detail: "Route 1 · ~42 km · Rs. 20" },
+                  { name: "Bhera Terminal", detail: "Route 2 · ~68 km · Rs. 20" },
+                  { name: "Kot Momin Terminal", detail: "Route 3 · ~35 km · Rs. 20" },
+                  { name: "Sillanwali Terminal", detail: "Route 4 · ~55 km · Rs. 20" },
+                  { name: "Shahpur City Terminal", detail: "Route 5 · ~48 km · Rs. 20" },
                 ].map((stop, i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:border-primary/20 transition-all cursor-pointer group">
                     <div>
                       <p className="font-semibold text-sm group-hover:text-primary transition-colors">{stop.name}</p>
                       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3" /> {stop.time}
+                        <Clock className="w-3 h-3" /> {stop.detail}
                       </p>
                     </div>
                     <Star className="w-4 h-4 text-muted-foreground group-hover:text-yellow-500 transition-colors" />

@@ -4,9 +4,11 @@ import { BentoStats } from "@/components/BentoStats";
 import BusMap from "@/components/BusMap";
 import WeatherWidget from "@/components/WeatherWidget";
 import { FeatureShowcase } from "@/components/FeatureShowcase";
+import { FleetShowcase } from "@/components/FleetShowcase";
 import { Partners } from "@/components/Partners";
 import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
+import { GraduationCap, Award, BookOpen } from "lucide-react";
 
 const Index = () => {
   return (
@@ -58,7 +60,9 @@ const Index = () => {
         </section>
 
         <BentoStats />
+        <FleetShowcase />
         <FeatureShowcase />
+        
         <Partners />
       </article>
       
