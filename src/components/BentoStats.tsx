@@ -63,8 +63,8 @@ const RouteAnimation = () => {
       {/* Stops */}
       <circle cx="20" cy="50" r="4" fill="hsl(152 100% 32% / 0.5)" />
       <circle cx="340" cy="50" r="4" fill="hsl(152 100% 32% / 0.5)" />
-      <text x="20" y="75" fill="hsl(215 16% 57%)" fontSize="10" textAnchor="middle">University Rd</text>
-      <text x="340" y="75" fill="hsl(215 16% 57%)" fontSize="10" textAnchor="middle">Company Bagh</text>
+      <text x="20" y="75" fill="hsl(215 16% 57%)" fontSize="10" textAnchor="middle">GBS Sargodha</text>
+      <text x="340" y="75" fill="hsl(215 16% 57%)" fontSize="10" textAnchor="middle">Bhalwal Terminus</text>
     </svg>
   );
 };
@@ -143,32 +143,26 @@ export const BentoStats = () => {
             <RouteAnimation />
           </motion.div>
 
-          {/* Avg Wait Time */}
+          {/* Total Routes */}
           <motion.div
             variants={itemVariants}
             className="glass-card glass-card-hover p-6 flex flex-col justify-between"
           >
-            <Clock className="w-8 h-8 text-primary mb-4" />
-            <div>
-              <div className="font-display font-bold text-3xl text-foreground">
-                <AnimatedCounter end={5} /> min
-              </div>
-              <p className="text-muted-foreground text-sm">Avg Wait Time</p>
+            <div className="font-display font-bold text-5xl text-primary mb-2">
+              <AnimatedCounter end={8} />
             </div>
+            <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wider">Active Routes</p>
           </motion.div>
 
-          {/* Zero Carbon */}
+          {/* Total Stops */}
           <motion.div
             variants={itemVariants}
             className="glass-card glass-card-hover p-6 flex flex-col justify-between"
           >
-            <Leaf className="w-8 h-8 text-primary mb-4" />
-            <div>
-              <div className="font-display font-bold text-2xl text-foreground">
-                Zero Carbon
-              </div>
-              <p className="text-muted-foreground text-sm">Eco Transit</p>
+            <div className="font-display font-bold text-5xl text-primary mb-2">
+              <AnimatedCounter end={128} />
             </div>
+            <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wider">Official Stops</p>
           </motion.div>
         </motion.div>
       </div>
