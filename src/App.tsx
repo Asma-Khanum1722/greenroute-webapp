@@ -11,6 +11,10 @@ import DriverDashboard from "@/pages/DriverDashboard";
 import PassengerDashboard from "@/pages/PassengerDashboard";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import NotFound from "@/pages/NotFound";
+import { Navigate } from "react-router-dom";
+import AdminOverview from "@/pages/admin/AdminOverview";
+import AdminFleet from "@/pages/admin/AdminFleet";
+import AdminTelemetry from "@/pages/admin/AdminTelemetry";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +35,12 @@ const App = () => (
                 <AdminDashboard />
               </ProtectedRoute>
             } 
-          />
+          >
+            <Route index element={<Navigate to="/admin/overview" replace />} />
+            <Route path="overview" element={<AdminOverview />} />
+            <Route path="fleet" element={<AdminFleet />} />
+            <Route path="telemetry" element={<AdminTelemetry />} />
+          </Route>
           <Route 
             path="/driver" 
             element={
