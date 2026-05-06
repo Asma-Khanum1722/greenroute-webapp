@@ -157,7 +157,7 @@ export const FeatureShowcase = () => {
 
           {/* Feature 2: Visual Left, Text Right */}
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <div>
+            <div className="order-1">
               <FloatingCard />
             </div>
             <motion.div
@@ -165,22 +165,23 @@ export const FeatureShowcase = () => {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
+              className="order-2"
             >
               <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center mb-6">
-                <Brain className="w-7 h-7 text-primary" />
+                <Clock className="w-7 h-7 text-primary" />
               </div>
               <h3 className="font-display font-bold text-2xl sm:text-3xl lg:text-4xl text-foreground mb-4">
-                Smart ETAs
+                Live Telemetry
               </h3>
               <p className="text-muted-foreground text-lg leading-relaxed mb-6">
-                AI-powered arrival predictions that learn from traffic patterns,
-                weather conditions, and historical data to give you accurate ETAs.
+                Direct WebSocket streaming from the fleet to your device. Get second-by-second 
+                updates on bus location, speed, and occupancy.
               </p>
               <ul className="space-y-3">
                 {[
-                  "Machine learning predictions",
-                  "Traffic pattern analysis",
-                  "98% accuracy rate",
+                  "Real-time WebSocket data",
+                  "Direct database sync",
+                  "Zero-latency updates",
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary" />
