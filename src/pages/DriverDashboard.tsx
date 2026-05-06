@@ -10,6 +10,7 @@ import { ref, set, update } from "firebase/database";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { SARGODHA_ROUTES } from "@/lib/routes";
 import { 
   Select, 
   SelectContent, 
@@ -23,10 +24,26 @@ export default function DriverDashboard() {
   // The <number | null>, <string>, etc. are TypeScript types that tell the editor 
   // exactly what kind of data to expect, preventing bugs during the demo.
   const [isTracking, setIsTracking] = useState(false);
-  const [watchId, setWatchId] = useState<number | null>(null); // Stores the ID of the GPS listener
+  const [watchId, setWatchId] = useState<number | null>(null);
   const [driverName, setDriverName] = useState<string>("");
   const [assignedBusId, setAssignedBusId] = useState<string | null>(null);
+  const [assignedRouteId, setAssignedRouteId] = useState<string>("bhalwal"); // Default to Route 1
+  const [locationPermission, setLocationPermission] = useState<PermissionState | "unsupported">("prompt");
   const navigate = useNavigate();
+
+  // VIVA-NOTE: Browsers block GPS on non-HTTPS sites. We must warn the user.
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationPermission("unsupported");
+      return;
+    }
+
+    // Check if we are on a secure context (localhost or HTTPS)
+    if (!window.isSecureContext && window.location.hostname !== "localhost") {
+      toast.warning("Insecure Context: Mobile GPS requires HTTPS. Check the 'Chrome Hack' in console.");
+      console.warn("DEV TIP: Go to chrome://flags/#unsafely-treat-insecure-origin-as-secure and add http://192.168.1.9:8080");
+    }
+  }, []);
 
   // Create list of 33 buses
   const busPorts = Array.from({ length: 33 }, (_, i) => `e${i + 1}`);
@@ -50,56 +67,56 @@ export default function DriverDashboard() {
     navigate("/login");
   };
 
-  // START TRACKING: This is the core 'Real-Time' engine.
   const startTracking = () => {
     if (!assignedBusId) {
       toast.error("Please select a bus before starting your shift.");
       return;
     }
     
-    // Check if the device actually supports GPS
     if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by your browser");
+      toast.error("GPS not supported on this device.");
       return;
     }
 
-    setIsTracking(true);
-    toast.success(`Shift Started: Bus ${assignedBusId.toUpperCase()}`);
+    // Attempt to get position to trigger the browser popup
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setIsTracking(true);
+        toast.success(`Shift Started: Bus ${assignedBusId.toUpperCase()}`);
 
-    // VIVA-EXPLANATION: 'watchPosition' is better than 'getCurrentPosition' because
-    // it automatically fires whenever the driver moves, providing a 'Live' stream.
-    const id = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude, speed, heading } = position.coords;
-        
-        // PUSH TO RTDB: We use the Firebase Realtime Database for sub-second latency.
-        const busRef = ref(rtdb, `buses/${assignedBusId}`);
-        set(busRef, {
-          id: `${assignedBusId.toUpperCase()}-91`, // '91' represents the Sargodha route code
-          lat: latitude,
-          lng: longitude,
-          speed: speed ? Math.round(speed * 3.6) : 0, // Converting Meters/Second to KM/H
-          heading: heading || 0,
-          lastUpdated: Date.now(),
-          status: "active",
-          driverName: driverName
-        });
+        const id = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude, speed, heading } = position.coords;
+            const busRef = ref(rtdb, `buses/${assignedBusId}`);
+            const route = SARGODHA_ROUTES.find(r => r.id === assignedRouteId);
+            
+            set(busRef, {
+              id: assignedBusId.toUpperCase(),
+              routeId: assignedRouteId,
+              routeName: route?.name || "",
+              lat: latitude,
+              lng: longitude,
+              speed: speed ? Math.round(speed * 3.6) : 0,
+              heading: heading || 0,
+              lastUpdated: Date.now(),
+              status: "active",
+              driverName: driverName
+            });
+          },
+          (error) => {
+            console.error("GPS Error:", error);
+            toast.error("GPS Signal Lost.");
+            stopTracking();
+          },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+        setWatchId(id);
       },
       (error) => {
-        console.error("GPS Error:", error);
-        // Professional error handling makes the app feel robust
-        if (error.code === 1) toast.error("Location Permission Denied.");
-        else if (error.code === 3) toast.error("GPS Timeout. Moving outdoors might help.");
-        else toast.error("Lost GPS connection. Retrying...");
-      },
-      { 
-        enableHighAccuracy: true, // Forces the device to use GPS chips, not just WiFi/Cellular
-        maximumAge: 0,            // Don't use cached locations; we want fresh data
-        timeout: 10000            // If we don't get a fix in 10s, trigger the error
+        toast.error("Location access denied. Please enable GPS in settings.");
+        console.error(error);
       }
     );
-
-    setWatchId(id);
   };
 
   const stopTracking = () => {
@@ -164,6 +181,26 @@ export default function DriverDashboard() {
                     {busPorts.map((id) => (
                       <SelectItem key={id} value={id}>
                         Electrical Bus {id.toUpperCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-muted-foreground">Assigned Route</label>
+                <Select 
+                  disabled={isTracking} 
+                  onValueChange={setAssignedRouteId}
+                  value={assignedRouteId}
+                >
+                  <SelectTrigger className="w-full bg-foreground/5 h-12 border-primary/10">
+                    <SelectValue placeholder="Select Your Route" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SARGODHA_ROUTES.map((route) => (
+                      <SelectItem key={route.id} value={route.id}>
+                        {route.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

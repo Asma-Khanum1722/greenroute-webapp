@@ -35,6 +35,16 @@ export default function FleetTelemetry() {
     return () => unsubscribe();
   }, []);
 
+  const formatTimeAgo = (timestamp: number) => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 5) return "Just now";
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  };
+
   return (
     <div className="glass-card overflow-hidden border-primary/20">
       <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
@@ -95,7 +105,7 @@ export default function FleetTelemetry() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right font-mono text-[10px] text-muted-foreground">
-                    {Math.floor((Date.now() - bus.lastUpdated) / 1000)}s ago
+                    {formatTimeAgo(bus.lastUpdated)}
                   </td>
                 </motion.tr>
               ))}
