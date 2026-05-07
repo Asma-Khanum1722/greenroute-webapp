@@ -17,18 +17,18 @@ export const HeroSection = () => {
       <div className="absolute inset-0 bg-gradient-to-b from-background via-background/20 to-background z-0" />
       <div className="absolute inset-0 noise-overlay opacity-5 pointer-events-none z-0" />
 
-      {/* Main Content - Massive vertical padding */}
-      <div className="relative z-20 container mx-auto px-6 pt-48 pb-32">
+      {/* Main Content */}
+      <div className="relative z-20 container mx-auto px-10 md:px-16 lg:px-32 pt-24 pb-16 md:pt-48 md:pb-32">
         <div className="flex flex-col items-center text-center max-w-4xl mx-auto">
           {/* Refined Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white leading-[1.2] tracking-tight mb-8"
+            className="font-display font-bold text-4xl sm:text-5xl lg:text-7xl text-white leading-[1.1] tracking-tight mb-6 md:mb-8"
           >
-            Sargodha Moves with <br />
-            <span className="text-gradient-green italic">GreenRoute.</span>
+            Sargodha Moves with{" "}
+            <span className="text-gradient-green italic block md:inline">GreenRoute.</span>
           </motion.h1>
 
           {/* Refined Subheadline */}
@@ -36,7 +36,7 @@ export const HeroSection = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-sm sm:text-base text-muted-foreground max-w-xl mb-12 leading-relaxed opacity-70"
+            className="text-xs sm:text-base text-muted-foreground max-w-lg mb-8 md:mb-12 leading-relaxed opacity-70 px-4"
           >
             The division's first fully electric transit network. 
             Real-time tracking for every bus, every stop, every day.
@@ -50,11 +50,11 @@ export const HeroSection = () => {
           >
             <Button
               size="lg"
-              className="bg-primary hover:bg-primary/90 text-black rounded-full px-12 py-8 text-lg font-bold uppercase tracking-widest transition-all duration-500"
+              className="px-12 py-8"
               onClick={() => document.getElementById('live-map')?.scrollIntoView({ behavior: 'smooth' })}
             >
-              Live Fleet Map
-              <ArrowRight className="w-6 h-6 ml-3" />
+              Explore Map
+              <ArrowRight className="w-5 h-5 ml-3 transition-transform duration-500 group-hover:translate-x-2" />
             </Button>
           </motion.div>
         </div>

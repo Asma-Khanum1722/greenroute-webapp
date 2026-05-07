@@ -102,24 +102,24 @@ const FloatingCard = () => (
 
 export const FeatureShowcase = () => {
   return (
-    <section className="py-24 relative overflow-hidden">
-      <div className="container mx-auto px-6">
+    <section id="about" className="py-10 md:py-24 relative overflow-hidden scroll-mt-40">
+      <div className="container mx-auto px-10 md:px-16 lg:px-32">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-20"
+          className="text-center mb-10 md:mb-20"
         >
-          <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-foreground mb-4">
-            Built for Precision
+          <h2 className="font-display font-bold text-2xl sm:text-4xl lg:text-5xl text-foreground mb-4">
+            The GreenRoute Mission
           </h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+          <p className="text-muted-foreground text-sm sm:text-lg max-w-xl mx-auto">
             Technology that makes public transit reliable
           </p>
         </motion.div>
 
-        <div className="space-y-32">
+        <div className="space-y-12 md:space-y-32">
           {/* Feature 1: Text Left, Visual Right */}
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             <motion.div

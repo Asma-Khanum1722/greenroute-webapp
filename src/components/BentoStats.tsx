@@ -1,6 +1,9 @@
 import { motion, useInView } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
-import { Leaf, Clock, MapPin } from "lucide-react";
+import { Leaf, Clock, MapPin, Bus } from "lucide-react";
+import { rtdb } from "@/lib/firebase";
+import { ref, onValue } from "firebase/database";
+import { SARGODHA_ROUTES } from "@/lib/routes";
 
 const AnimatedCounter = ({ end, duration = 2 }: { end: number; duration?: number }) => {
   const [count, setCount] = useState<number>(0);
@@ -72,6 +75,25 @@ const RouteAnimation = () => {
 export const BentoStats = () => {
   const containerRef = useRef(null);
   const isInView = useInView(containerRef, { once: true, margin: "-100px" });
+  
+  const [activeBusesCount, setActiveBusesCount] = useState(0);
+  const totalRoutesCount = SARGODHA_ROUTES.length;
+  const totalStopsCount = SARGODHA_ROUTES.reduce((acc, route) => acc + route.stops.length, 0);
+
+  useEffect(() => {
+    const busesRef = ref(rtdb, "buses");
+    const unsubscribe = onValue(busesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const count = Object.values(data).filter((bus: any) => bus.status === "active").length;
+        setActiveBusesCount(count);
+      } else {
+        setActiveBusesCount(0);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -87,58 +109,62 @@ export const BentoStats = () => {
   };
 
   return (
-    <section className="py-24 relative overflow-hidden">
+    <section id="status" className="py-8 md:py-24 relative overflow-hidden scroll-mt-32">
       {/* Background Elements */}
       <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
       <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary/3 rounded-full blur-2xl" />
 
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-10 md:px-16 lg:px-32">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-10 md:mb-16"
         >
-          <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-foreground mb-4">
+          <h2 className="font-display font-bold text-2xl md:text-4xl lg:text-5xl text-white mb-3">
             System Status
           </h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Real-time metrics from Sargodha's transit network
+          <p className="text-white/40 text-sm md:text-lg max-w-xl mx-auto">
+            Real-time metrics from Sargodha's network
           </p>
         </motion.div>
-
+ 
         <motion.div
           ref={containerRef}
           variants={containerVariants}
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"
         >
           {/* Active Buses - Tall Card */}
           <motion.div
             variants={itemVariants}
-            className="col-span-2 lg:col-span-1 lg:row-span-2 glass-card glass-card-hover p-8 flex flex-col justify-between bg-gradient-to-br from-primary/20 to-primary/5"
+            className="sm:col-span-2 lg:col-span-1 lg:row-span-2 glass-card p-6 md:p-8 flex flex-col justify-between bg-gradient-to-br from-primary/20 to-primary/5 min-h-[220px]"
           >
-            <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center mb-6">
-              <MapPin className="w-6 h-6 text-primary" />
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-primary/20 flex items-center justify-center mb-6">
+              <Bus className="w-5 h-5 md:w-6 md:h-6 text-primary" />
             </div>
             <div>
-              <div className="font-display font-bold text-6xl lg:text-7xl text-foreground mb-2">
-                <AnimatedCounter end={33} />
+              <div className="font-display font-bold text-4xl sm:text-5xl lg:text-7xl text-white mb-2 leading-none">
+                <AnimatedCounter end={activeBusesCount} />
               </div>
-              <p className="text-muted-foreground text-lg">Active Buses</p>
+              <p className="text-white/40 text-xs sm:text-lg">Active Buses</p>
+              <div className="flex items-center gap-2 mt-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                <span className="text-[8px] md:text-[10px] uppercase font-bold tracking-widest text-primary">Live Signal Stream</span>
+              </div>
             </div>
           </motion.div>
 
           {/* Live Map Preview - Wide Card */}
           <motion.div
             variants={itemVariants}
-            className="col-span-2 glass-card glass-card-hover p-6"
+            className="sm:col-span-2 glass-card glass-card-hover p-6 min-h-[160px]"
           >
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
-              <span className="text-sm text-muted-foreground">Live Map Preview</span>
+              <span className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Network Trajectory</span>
             </div>
             <RouteAnimation />
           </motion.div>
@@ -146,26 +172,27 @@ export const BentoStats = () => {
           {/* Total Routes */}
           <motion.div
             variants={itemVariants}
-            className="glass-card glass-card-hover p-6 flex flex-col justify-between"
+            className="glass-card glass-card-hover p-6 flex flex-col justify-between min-h-[140px]"
           >
-            <div className="font-display font-bold text-5xl text-primary mb-2">
-              <AnimatedCounter end={8} />
+            <div className="font-display font-bold text-4xl sm:text-5xl text-primary mb-2">
+              <AnimatedCounter end={totalRoutesCount} />
             </div>
-            <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wider">Active Routes</p>
+            <p className="text-muted-foreground text-[10px] sm:text-sm font-semibold uppercase tracking-wider">Active Routes</p>
           </motion.div>
 
           {/* Total Stops */}
           <motion.div
             variants={itemVariants}
-            className="glass-card glass-card-hover p-6 flex flex-col justify-between"
+            className="glass-card glass-card-hover p-6 flex flex-col justify-between min-h-[140px]"
           >
-            <div className="font-display font-bold text-5xl text-primary mb-2">
-              <AnimatedCounter end={128} />
+            <div className="font-display font-bold text-4xl sm:text-5xl text-primary mb-2">
+              <AnimatedCounter end={totalStopsCount} />
             </div>
-            <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wider">Official Stops</p>
+            <p className="text-muted-foreground text-[10px] sm:text-sm font-semibold uppercase tracking-wider">Official Stops</p>
           </motion.div>
         </motion.div>
       </div>
     </section>
   );
 };
+

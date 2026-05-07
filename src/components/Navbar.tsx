@@ -1,20 +1,46 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Leaf, Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 const navLinks = [
   { label: "Map", href: "/#live-map" },
+  { label: "About Us", href: "/#about" },
   { label: "Routes", href: "/routes" },
-  { label: "Schedules", href: "/routes#schedule" },
 ];
 
 export const Navbar = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          setRole(userDoc.data()?.role || "passenger");
+        }
+      } else {
+        setRole(null);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    navigate("/");
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -47,7 +73,7 @@ export const Navbar = () => {
           : "py-5 bg-transparent"
       }`}
     >
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-10 md:px-16 lg:px-32">
         <div className="relative flex items-center justify-between">
           {/* Logo - Aligned Left */}
           <Link to="/" className="flex items-center gap-2 z-10">
@@ -59,29 +85,53 @@ export const Navbar = () => {
 
           {/* Centered Links - Mathematically Centered */}
           <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-10">
-            {navLinks.map((link) => (
-              <Link
-                key={link.label}
-                to={link.href}
-                className="text-sm font-medium text-white/50 hover:text-primary transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isHash = link.href.startsWith("/#");
+              const targetId = isHash ? link.href.split("#")[1] : null;
+
+              return (
+                <Link
+                  key={link.label}
+                  to={link.href}
+                  onClick={(e) => {
+                    if (isHash && location.pathname === "/") {
+                      e.preventDefault();
+                      document.getElementById(targetId!)?.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
+                  className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 hover:text-primary transition-all duration-300"
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </div>
 
           {/* CTAs - Aligned Right */}
           <div className="hidden md:flex items-center gap-6 z-10">
-            <Link to="/login?portal=driver">
-              <span className="text-xs font-medium text-white/40 hover:text-white transition-colors cursor-pointer">
-                Driver
-              </span>
-            </Link>
-            <Link to="/login?portal=passenger">
-              <Button size="sm" className="bg-primary hover:bg-emerald-500 text-black font-bold px-5 rounded-full h-9">
-                Passenger Portal
-              </Button>
-            </Link>
+            {currentUser ? (
+              <>
+                <Link to={role === "admin" ? "/control" : role === "driver" ? "/driver" : "/passenger"}>
+                  <Button variant="outline" size="sm" className="h-9 px-6 text-[10px] font-bold uppercase tracking-widest border-primary/20 hover:border-primary/50 text-primary">
+                    My Dashboard
+                  </Button>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleLogout}
+                  className="text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-primary transition-colors"
+                >
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Link to="/login">
+                <Button size="sm" className="h-9 px-6 text-[10px] font-bold uppercase tracking-widest">
+                  Access Portal
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu */}
@@ -103,17 +153,44 @@ export const Navbar = () => {
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden bg-background/95 backdrop-blur-xl border-b border-white/5"
           >
-            <div className="container mx-auto px-6 py-6 flex flex-col gap-6">
+            <div className="container mx-auto px-10 py-6 flex flex-col gap-6">
               {navLinks.map((link) => (
                 <Link
                   key={link.label}
                   to={link.href}
-                  className="text-sm font-medium text-white/60"
+                  className="text-xs font-bold uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
                   onClick={() => setIsOpen(false)}
                 >
                   {link.label}
                 </Link>
               ))}
+              <div className="pt-6 border-t border-white/5 flex flex-col gap-4">
+                {currentUser ? (
+                  <>
+                    <Link 
+                      to={role === "admin" ? "/control" : role === "driver" ? "/driver" : "/passenger"}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <Button className="w-full py-6 text-[10px] font-bold uppercase tracking-[0.2em]">
+                        My Dashboard
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { handleLogout(); setIsOpen(false); }}
+                      className="w-full text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 hover:text-primary"
+                    >
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <Link to="/login" onClick={() => setIsOpen(false)}>
+                    <Button className="w-full h-11 text-[10px] font-bold uppercase tracking-[0.2em]">
+                      Access Portal
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
