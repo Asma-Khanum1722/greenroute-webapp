@@ -13,8 +13,11 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import NotFound from "@/pages/NotFound";
 import { Navigate } from "react-router-dom";
 import AdminOverview from "@/pages/admin/AdminOverview";
+import AdminRoutes from "./pages/admin/AdminRoutes";
 import AdminFleet from "@/pages/admin/AdminFleet";
 import AdminTelemetry from "@/pages/admin/AdminTelemetry";
+
+import { ChatWidget } from "@/components/ChatWidget";
 
 const queryClient = new QueryClient();
 
@@ -24,20 +27,22 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ChatWidget />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/routes" element={<RoutesSchedules />} />
           <Route path="/login" element={<Auth />} />
           <Route 
-            path="/admin" 
+            path="/control" 
             element={
               <ProtectedRoute allowedRole="admin">
                 <AdminDashboard />
               </ProtectedRoute>
             } 
           >
-            <Route index element={<Navigate to="/admin/overview" replace />} />
+            <Route index element={<Navigate to="/control/overview" replace />} />
             <Route path="overview" element={<AdminOverview />} />
+            <Route path="routes" element={<AdminRoutes />} />
             <Route path="fleet" element={<AdminFleet />} />
             <Route path="telemetry" element={<AdminTelemetry />} />
           </Route>
@@ -49,14 +54,7 @@ const App = () => (
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/passenger" 
-            element={
-              <ProtectedRoute allowedRole="passenger">
-                <PassengerDashboard />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/passenger" element={<PassengerDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
