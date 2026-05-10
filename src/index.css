@@ -96,11 +96,6 @@
     background: rgba(16, 185, 129, 0.2);
   }
 
-  /* Map Specific Styling */
-  .map-charcoal-gray {
-    filter: brightness(1.8) contrast(1.1) grayscale(0.2) !important;
-  }
-
   /* Global Leaflet Overrides for Sovereign Theme */
   .leaflet-popup-content-wrapper {
     @apply bg-background/90 backdrop-blur-xl border border-white/10 text-white rounded-xl shadow-2xl !important;
@@ -121,5 +116,76 @@
 
   .leaflet-control-zoom-in, .leaflet-control-zoom-out {
     @apply bg-white/5 border-white/10 text-white hover:bg-white/10 !important;
+  }
+
+  /* Global Premium Button Animation */
+  .btn-premium-fill {
+    @apply relative overflow-hidden z-[1] transition-all duration-500 !important;
+  }
+
+  .btn-premium-fill::before {
+    content: '';
+    @apply absolute inset-0 h-full w-full bg-primary transition-all duration-500 ease-out z-[-1] right-0 !important;
+  }
+
+  .btn-premium-fill:hover::before {
+    @apply w-0 !important;
+  }
+
+  .btn-premium-destructive {
+    @apply relative overflow-hidden z-[1] transition-all duration-500 !important;
+  }
+
+  .btn-premium-destructive::before {
+    content: '';
+    @apply absolute inset-0 h-full w-full bg-destructive transition-all duration-500 ease-out z-[-1] right-0 !important;
+  }
+
+  .btn-premium-destructive:hover::before {
+    @apply w-0 !important;
+  }
+
+  .btn-premium-secondary {
+    @apply relative overflow-hidden z-[1] transition-all duration-500 !important;
+  }
+
+  .btn-premium-secondary::before {
+    content: '';
+    @apply absolute inset-0 h-full w-full bg-white/5 transition-all duration-500 ease-out z-[-1] right-0 !important;
+  }
+
+  .btn-premium-secondary:hover::before {
+    @apply w-0 !important;
+  }
+
+  .btn-premium-outline {
+    @apply relative overflow-hidden z-[1] transition-all duration-500 !important;
+  }
+
+  .btn-premium-outline::before {
+    content: '';
+    @apply absolute inset-0 h-full w-full bg-transparent transition-all duration-500 ease-out z-[-1] right-0 !important;
+  }
+
+  .btn-premium-outline:hover::before {
+    @apply w-0 !important;
+  }
+
+  /* Map Marker Animations */
+  @keyframes marker-pulse {
+    0% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(16, 185, 129, 0.7)); }
+    70% { box-shadow: 0 0 0 15px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+
+  .animate-marker-pulse {
+    animation: marker-pulse 2s infinite;
+    border-radius: 50%;
+  }
+
+  .animate-marker-pulse-idle {
+    --pulse-color: rgba(245, 158, 11, 0.7);
+    animation: marker-pulse 2s infinite;
+    border-radius: 50%;
   }
 }

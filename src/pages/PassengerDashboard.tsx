@@ -10,9 +10,12 @@ import { rtdb, auth, db } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { SARGODHA_ROUTES } from "@/lib/routes";
+import { useRoutes } from "@/lib/routes";
+import { useNavigate } from "react-router-dom";
 
 export default function PassengerDashboard() {
+  const routes = useRoutes();
+  const navigate = useNavigate();
   const [userName, setUserName] = useState("");
   const [activeBuses, setActiveBuses] = useState(0);
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(false);
@@ -21,6 +24,10 @@ export default function PassengerDashboard() {
   const [targetStop, setTargetStop] = useState<any>(null);
   const [liveBuses, setLiveBuses] = useState<any[]>([]);
   const [calcETA, setCalcETA] = useState<((bus: any) => string) | null>(null);
+
+  const filteredBuses = liveBuses.filter(bus => 
+    selectedRoute === "all" || bus.routeId === selectedRoute
+  );
 
   // Haversine formula to calculate distance in km
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -95,6 +102,17 @@ export default function PassengerDashboard() {
   }, [isNotificationsEnabled]);
 
   const requestNotificationPermission = async () => {
+    if (!auth.currentUser) {
+      toast.error("Sign in required", {
+        description: "Please log in to enable live proximity alerts.",
+        action: {
+          label: "Login",
+          onClick: () => navigate("/login?portal=passenger")
+        }
+      });
+      return;
+    }
+
     if (!("Notification" in window)) {
       toast.error("This browser does not support desktop notifications");
       return;
@@ -109,49 +127,71 @@ export default function PassengerDashboard() {
     }
   };
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background overflow-hidden flex flex-col">
       <Navbar />
       
-      <div className="pt-24 pb-12 container mx-auto px-6">
-        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            <h1 className="text-4xl font-display font-bold">Welcome, {userName || "Passenger"}</h1>
-            <p className="text-muted-foreground mt-2 font-medium">Your Sargodha Smart Transit Portal is active.</p>
-          </motion.div>
+      <div className="flex-1 pt-24 pb-8 container mx-auto px-6 flex flex-col gap-6">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/[0.02] border border-white/5 p-4 md:p-6 rounded-2xl md:rounded-3xl backdrop-blur-xl">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+              <Navigation className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg md:text-xl font-display font-bold">Welcome, {userName || "Passenger"}</h1>
+              <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium flex items-center gap-2 uppercase tracking-widest">
+                Transit Portal
+                {!userName && (
+                  <a href="/login" className="text-primary hover:underline decoration-primary/30">Sign in →</a>
+                )}
+              </p>
+            </div>
+          </div>
           
-          <div className="flex flex-col gap-2 w-full md:w-72">
-            <label className="text-xs font-bold uppercase tracking-widest text-primary">Live Route Filter</label>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="hidden lg:flex flex-col items-end mr-2">
+              <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-[0.2em] flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                {activeBuses} Units Active
+              </span>
+            </div>
+            
             <select 
               value={selectedRoute}
               onChange={(e) => setSelectedRoute(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-xl h-12 px-4 text-sm focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer hover:bg-white/10"
+              className="bg-white/5 border border-white/10 rounded-xl h-10 px-4 text-[10px] font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer hover:bg-white/10 flex-1 md:flex-none min-w-[140px]"
             >
-              <option value="all" className="bg-[#0A0A0A]">All Active Routes</option>
-              {SARGODHA_ROUTES.map(route => (
+              <option value="all" className="bg-[#0A0A0A]">ALL ROUTES</option>
+              {routes.map(route => (
                 <option key={route.id} value={route.id} className="bg-[#0A0A0A]">
-                  {route.name} ({route.busCount} buses)
+                  {route.name.toUpperCase()}
                 </option>
               ))}
             </select>
+
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="h-10 gap-2 border-white/10 transition-all flex-1 md:flex-none lg:flex"
+            >
+              <Info className="w-4 h-4" />
+              <span className="text-[10px] font-bold uppercase">{isSidebarOpen ? 'Hide Info' : 'Show Info'}</span>
+            </Button>
           </div>
         </header>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="flex-1 grid lg:grid-cols-12 gap-6 min-h-0">
           {/* Main Map View */}
-          <div className="lg:col-span-2 space-y-8">
-            <section className="glass-card p-4 overflow-hidden relative group">
-              <div className="absolute top-8 left-8 z-20 flex gap-2">
-                <div className="bg-background/80 backdrop-blur-md px-4 py-2 rounded-full border border-primary/20 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold uppercase tracking-wider">{activeBuses} Buses Active</span>
-                </div>
-              </div>
+          <motion.div 
+            layout
+            className={`${isSidebarOpen ? 'lg:col-span-8' : 'lg:col-span-12'} flex flex-col gap-6 transition-all duration-500`}
+          >
+            <section className="glass-card p-2 overflow-hidden relative group border-white/5">
               <BusMap 
-                className="h-[600px] rounded-xl border-none" 
+                className="rounded-2xl border-none" 
                 selectedRoute={selectedRoute}
                 targetStop={targetStop}
                 onSelectStop={(stop) => {
@@ -164,11 +204,44 @@ export default function PassengerDashboard() {
                 }}
               />
             </section>
-          </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="glass-card p-4 border-white/5 bg-white/[0.02] flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <MapPin className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground">Status</h3>
+                  <p className="text-xs font-bold">Operational</p>
+                </div>
+              </div>
+              <div className="glass-card p-4 border-white/5 bg-white/[0.02] flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                  <Clock className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div>
+                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground">Frequency</h3>
+                  <p className="text-xs font-bold">Every 60m</p>
+                </div>
+              </div>
+              <div className="lg:col-span-2 glass-card px-6 border-blue-500/10 bg-blue-500/5 flex items-center gap-3">
+                <Info className="w-4 h-4 text-blue-500" />
+                <p className="text-[10px] text-blue-200/60 font-medium">Regular schedules active. Free travel for women & students.</p>
+              </div>
+            </div>
+          </motion.div>
 
           {/* Sidebar Tools */}
-          <div className="space-y-6">
-            {/* Live ETA Panel */}
+          <AnimatePresence>
+            {isSidebarOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.4 }}
+                className="lg:col-span-4 space-y-6"
+              >
+                {/* Live ETA Panel */}
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -224,11 +297,12 @@ export default function PassengerDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Never miss your bus again. Get notified automatically when your selected vehicle is 1.5km away.
+                  Never miss your bus again. Get notified automatically when your selected vehicle is 500 metres away.
                 </p>
                 <Button 
                   onClick={requestNotificationPermission}
-                  className={`w-full gap-2 font-bold h-12 rounded-xl transition-all ${isNotificationsEnabled ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-primary hover:bg-primary/90'}`}
+                  variant={isNotificationsEnabled ? "secondary" : "default"}
+                  className="w-full gap-2 font-bold h-12 rounded-xl transition-all"
                 >
                   <Navigation className="w-4 h-4" />
                   {isNotificationsEnabled ? (targetStop ? `MONITORING: ${targetStop.name}` : "SELECT A STOP ON MAP") : "ENABLE PROXIMITY ALERTS"}
@@ -243,42 +317,46 @@ export default function PassengerDashboard() {
 
             {/* Favorite Stops Card */}
             <Card className="border-white/5 glass-card">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2 font-display">
-                  <Star className="w-5 h-5 text-yellow-500" />
-                  Frequent Terminals
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm flex items-center gap-2 font-display uppercase tracking-widest">
+                  <Star className="w-4 h-4 text-yellow-500" />
+                  Terminals
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {[
-                  { name: "Chak 91 / General Bus Stand", detail: "Main Origin Hub — All Routes" },
-                  { name: "Bhalwal Terminal", detail: "Route 1 · ~42 km · Rs. 20" },
-                  { name: "Bhera Terminal", detail: "Route 2 · ~68 km · Rs. 20" },
-                  { name: "Kot Momin Terminal", detail: "Route 3 · ~35 km · Rs. 20" },
-                  { name: "Sillanwali Terminal", detail: "Route 4 · ~55 km · Rs. 20" },
-                  { name: "Shahpur City Terminal", detail: "Route 5 · ~48 km · Rs. 20" },
-                ].map((stop, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:border-primary/20 transition-all cursor-pointer group">
-                    <div>
-                      <p className="font-semibold text-sm group-hover:text-primary transition-colors">{stop.name}</p>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3" /> {stop.detail}
-                      </p>
+              <CardContent className="space-y-2 px-3 pb-3">
+                {routes.slice(0, 5).map((route, i) => {
+                  const terminal = route.stops[route.stops.length - 1];
+                  return (
+                    <div 
+                      key={i} 
+                      onClick={() => {
+                        if (!auth.currentUser) {
+                          toast.error("Sign in required", {
+                            description: "Login to save your favorite stops and terminals.",
+                            action: {
+                              label: "Login",
+                              onClick: () => navigate("/login?portal=passenger")
+                            }
+                          });
+                          return;
+                        }
+                        setTargetStop(terminal);
+                      }}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:border-primary/20 transition-all cursor-pointer group"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-bold group-hover:text-primary transition-colors truncate max-w-[140px]">{terminal.name}</span>
+                        <span className="text-[9px] text-muted-foreground mt-0.5">ETA: {Math.floor(Math.random() * 15) + 5} min</span>
+                      </div>
+                      <Star className={`w-3.5 h-3.5 transition-colors ${targetStop?.id === terminal.id ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground/30 group-hover:text-yellow-500'}`} />
                     </div>
-                    <Star className="w-4 h-4 text-muted-foreground group-hover:text-yellow-500 transition-colors" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* News Alert */}
-            <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl flex gap-3 items-start">
-              <Info className="w-5 h-5 text-blue-500 mt-1 shrink-0" />
-              <p className="text-xs text-blue-200/80 leading-relaxed">
-                <strong>Service Update:</strong> All electrical buses are currently operating on winter schedules. Free travel remains active for seniors.
-              </p>
-            </div>
-          </div>
+                  );
+                })}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
         </div>
       </div>
 

@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react";
 import { rtdb } from "@/lib/firebase";
 import { ref, onValue, remove, push, set } from "firebase/database";
-import { Bus, Trash2, Plus, ArrowRight, UserCheck } from "lucide-react";
+import { Bus, Trash2, Plus, ArrowRight, UserCheck, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
-import { SARGODHA_ROUTES } from "@/lib/routes";
+import { useRoutes } from "@/lib/routes";
 
 export const FleetManager = () => {
+  const routes = useRoutes();
   const [buses, setBuses] = useState<any[]>([]);
   const [newBusId, setNewBusId] = useState("");
-  const [selectedRoute, setSelectedRoute] = useState(SARGODHA_ROUTES[0].id);
+  const [selectedRoute, setSelectedRoute] = useState("r1");
 
   useEffect(() => {
     const busesRef = ref(rtdb, "buses");
@@ -58,34 +59,41 @@ export const FleetManager = () => {
   };
 
   return (
-    <div className="glass-card p-6 border-white/5">
-      <div className="flex items-center justify-between mb-8">
+    <div className="glass-card p-4 md:p-6 border-white/5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
         <div>
-          <h3 className="text-xl font-display font-bold text-white flex items-center gap-2">
+          <h3 className="text-lg md:text-xl font-display font-bold text-white flex items-center gap-2">
             <Bus className="w-5 h-5 text-primary" />
-            Fleet Inventory
+            Inventory
           </h3>
-          <p className="text-xs text-muted-foreground mt-1">Manage physical bus units and route assignments.</p>
+          <p className="text-[10px] md:text-xs text-white/40 mt-1 uppercase tracking-widest font-medium">Physical Fleet Management</p>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Input 
             placeholder="Bus ID (E.g. E34)" 
             value={newBusId}
             onChange={(e) => setNewBusId(e.target.value)}
-            className="w-32 bg-white/5 border-white/10 text-xs"
+            className="flex-1 sm:w-32 bg-white/5 border-white/10 text-[10px] font-bold uppercase tracking-widest h-10"
           />
-          <select 
-            value={selectedRoute}
-            onChange={(e) => setSelectedRoute(e.target.value)}
-            className="bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs text-white outline-none focus:ring-1 ring-primary/50"
-          >
-            {SARGODHA_ROUTES.map(r => (
-              <option key={r.id} value={r.id} className="bg-[#020617]">{r.name}</option>
-            ))}
-          </select>
-          <Button onClick={handleAddBus} size="sm" className="bg-primary text-black font-bold h-9">
-            <Plus className="w-4 h-4 mr-1" /> Add
+          <div className="relative flex-1 group">
+            <select 
+              value={selectedRoute}
+              onChange={(e) => setSelectedRoute(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-10 text-[10px] font-bold text-white outline-none appearance-none focus:ring-2 focus:ring-primary/40 transition-all cursor-pointer hover:bg-white/10"
+            >
+              {routes.map(r => (
+                <option key={r.id} value={r.id} className="bg-[#0A0F1A] text-white py-4">
+                  {r.id.toUpperCase()} — {r.name.toUpperCase()}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity">
+              <ChevronRight className="w-3 h-3 rotate-90" />
+            </div>
+          </div>
+          <Button onClick={handleAddBus} className="bg-primary text-black font-bold h-10 px-6 rounded-xl">
+            <Plus className="w-4 h-4 mr-2" /> ADD UNIT
           </Button>
         </div>
       </div>

@@ -147,14 +147,6 @@ export default function DriverDashboard() {
             </h1>
             <p className="text-muted-foreground mt-2">Sargodha Fleet Operation Dashboard</p>
           </div>
-          <Button 
-            variant="ghost" 
-            className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2 font-medium"
-            onClick={handleLogout}
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </Button>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -209,11 +201,8 @@ export default function DriverDashboard() {
 
               <Button
                 size="lg"
-                className={`w-full h-16 text-lg font-bold transition-all duration-500 rounded-xl gap-3 ${
-                  isTracking 
-                  ? "bg-destructive hover:bg-destructive/90 shadow-[0_0_20px_rgba(239,68,68,0.2)]" 
-                  : "bg-primary hover:bg-primary/90 shadow-[0_0_20px_rgba(34,197,94,0.2)]"
-                }`}
+                variant={isTracking ? "destructive" : "default"}
+                className="w-full h-16 text-lg font-bold transition-all duration-500 rounded-xl gap-3"
                 onClick={isTracking ? stopTracking : startTracking}
               >
                 <Power className={`w-6 h-6 ${isTracking ? "animate-pulse" : ""}`} />

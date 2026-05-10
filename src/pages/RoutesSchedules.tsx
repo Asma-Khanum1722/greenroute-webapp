@@ -43,10 +43,10 @@ const fares = [
 ];
 
 const downloads = [
-  { name: "Complete Route Map (All 8 Routes)", size: "4.2 MB", type: "PDF" },
-  { name: "Official Bus Schedule Timetable", size: "1.8 MB", type: "PDF" },
-  { name: "Fare Policy Chart 2025", size: "0.5 MB", type: "PDF" },
-  { name: "Fleet Specifications Guide", size: "2.5 MB", type: "PDF" },
+  { name: "Project Proposal (Full Scope)", size: "0.2 MB", type: "PDF", url: "/Project-Proposal (Bus Tracking App).pdf" },
+  { name: "SRS - System Requirements", size: "0.4 MB", type: "PDF", url: "/SRS Document.pdf" },
+  { name: "SDS - Design Specifications", size: "9.8 MB", type: "PDF", url: "/SDS Document - Version 2.0 (Approved).pdf" },
+  { name: "Fleet Specifications Guide", size: "2.5 MB", type: "PDF", url: "#" },
 ];
 
 const containerVariants = {
@@ -301,13 +301,20 @@ const RoutesSchedules = () => {
                     </span>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                <a 
+                  href={file.url} 
+                  download 
+                  target="_blank" 
+                  rel="noreferrer"
                 >
-                  <Download className="w-5 h-5" />
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                  >
+                    <Download className="w-5 h-5" />
+                  </Button>
+                </a>
               </motion.div>
             ))}
           </motion.div>

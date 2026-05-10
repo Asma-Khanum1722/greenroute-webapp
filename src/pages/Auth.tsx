@@ -42,7 +42,7 @@ export default function Auth() {
 
       const finalDoc = await getDoc(doc(db, "users", user.uid));
       const role = finalDoc.data()?.role;
-      if (role === "admin") navigate("/admin");
+      if (role === "admin") navigate("/control");
       else if (role === "driver") navigate("/driver");
       else navigate("/passenger");
 
@@ -74,7 +74,7 @@ export default function Auth() {
         const userDoc = await getDoc(doc(db, "users", cred.user.uid));
         if (!userDoc.exists()) throw new Error("User profile not found.");
         const userData = userDoc.data();
-        if (userData.role === "admin") navigate("/admin");
+        if (userData.role === "admin") navigate("/control");
         else if (userData.role === "driver") navigate("/driver");
         else navigate("/passenger");
       }
@@ -116,25 +116,6 @@ export default function Auth() {
             <p className="text-muted-foreground text-sm">{portalConfig[portal].desc}</p>
           </div>
 
-          {/* Portal Tabs — UI only, RBAC is enforced by Firestore role */}
-          {!isSignUp && (
-            <div className="flex gap-1 p-1 bg-white/5 rounded-xl mb-6 border border-white/10">
-              {(["passenger", "driver", "admin"] as Portal[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPortal(p)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all capitalize
-                    ${portal === p ? "bg-primary text-black shadow-lg" : "text-white/50 hover:text-white hover:bg-white/5"}`}
-                >
-                  {p === "passenger" && <User size={13} />}
-                  {p === "driver" && <Bus size={13} />}
-                  {p === "admin" && <ShieldCheck size={13} />}
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Form */}
           <form onSubmit={handleAuth} className="space-y-4">
             {isSignUp && (
@@ -164,10 +145,10 @@ export default function Auth() {
             />
             <Button
               type="submit"
-              className="w-full h-12 text-base font-bold bg-primary hover:bg-primary/90 text-black mt-1"
+              className="w-full h-12 text-sm mt-2 font-bold tracking-widest"
               disabled={loading}
             >
-              {loading ? "Please wait..." : isSignUp ? "Create Account" : `Sign in as ${portalConfig[portal].label}`}
+              {loading ? "AUTHENTICATING..." : isSignUp ? "CREATE ACCOUNT" : "SIGN IN"}
             </Button>
           </form>
 
@@ -179,13 +160,13 @@ export default function Auth() {
                   <span className="w-full border-t border-white/10" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-[#121212] px-2 text-white/40">Or continue with</span>
+                  <span className="bg-[#121212] px-2 text-white/40 font-bold tracking-widest">Or</span>
                 </div>
               </div>
               <Button
                 onClick={handleGoogleAuth}
-                variant="outline"
-                className="w-full h-12 border-white/10 hover:bg-white/5 text-white gap-3"
+                variant="secondary"
+                className="w-full h-12 gap-3"
                 disabled={loading}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
