@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bus, ShieldCheck, Users, User } from "lucide-react";
+import { Bus, ShieldCheck, User } from "lucide-react";
 import { auth, db, googleProvider } from "@/lib/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithRedirect, 
+  getRedirectResult 
+} from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -22,33 +27,49 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Google Sign-In — auto-creates a passenger profile if first time
+  // Handle Redirect Result
+  useEffect(() => {
+    const handleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          setLoading(true);
+          const user = result.user;
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          
+          if (!userDoc.exists()) {
+            await setDoc(doc(db, "users", user.uid), {
+              email: user.email,
+              role: "passenger",
+              name: user.displayName || "Passenger",
+              createdAt: new Date().toISOString()
+            });
+            toast.success("Welcome to GreenRoute!");
+          }
+
+          const finalDoc = await getDoc(doc(db, "users", user.uid));
+          const role = finalDoc.data()?.role;
+          if (role === "admin") navigate("/control");
+          else if (role === "driver") navigate("/driver");
+          else navigate("/passenger");
+        }
+      } catch (error: any) {
+        console.error("Redirect Error:", error);
+        toast.error(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    handleRedirect();
+  }, [navigate]);
+
+  // Google Sign-In — uses Redirect for production stability
   const handleGoogleAuth = async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          role: "passenger",
-          name: user.displayName || "Passenger",
-          createdAt: new Date().toISOString()
-        });
-        toast.success("Welcome to GreenRoute!");
-      }
-
-      const finalDoc = await getDoc(doc(db, "users", user.uid));
-      const role = finalDoc.data()?.role;
-      if (role === "admin") navigate("/control");
-      else if (role === "driver") navigate("/driver");
-      else navigate("/passenger");
-
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       toast.error(error.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -68,8 +89,6 @@ export default function Auth() {
         toast.success("Account created!");
         navigate("/passenger");
       } else {
-        // Login — role is read from Firestore, not from the tab
-        // The tab is just UI — RBAC is enforced by ProtectedRoute
         const cred = await signInWithEmailAndPassword(auth, email, password);
         const userDoc = await getDoc(doc(db, "users", cred.user.uid));
         if (!userDoc.exists()) throw new Error("User profile not found.");
@@ -103,20 +122,17 @@ export default function Auth() {
         <div className="glass-card p-8 relative overflow-hidden backdrop-blur-xl border-white/5 shadow-2xl">
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl" />
 
-          {/* Portal Icon */}
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20">
               {portalConfig[portal].icon}
             </div>
           </div>
 
-          {/* Title */}
           <div className="text-center mb-6">
             <h1 className="text-3xl font-display font-bold text-white mb-1">GreenRoute</h1>
             <p className="text-muted-foreground text-sm">{portalConfig[portal].desc}</p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleAuth} className="space-y-4">
             {isSignUp && (
               <Input
@@ -152,7 +168,6 @@ export default function Auth() {
             </Button>
           </form>
 
-          {/* Google Sign-In — available for passenger portal only */}
           {portal === "passenger" && (
             <>
               <div className="relative my-6">
@@ -180,7 +195,6 @@ export default function Auth() {
             </>
           )}
 
-          {/* Sign up toggle — passengers only */}
           {portal === "passenger" && (
             <div className="mt-6 text-center">
               <button

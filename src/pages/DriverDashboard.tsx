@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { MapPin, Power, Map as MapIcon, Navigation, LogOut, Bus as BusIcon, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { rtdb, auth, db } from "@/lib/firebase";
-import { ref, set, update } from "firebase/database";
+import { ref, set, update, onDisconnect } from "firebase/database";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +30,8 @@ export default function DriverDashboard() {
   const [assignedRouteId, setAssignedRouteId] = useState<string>("bhalwal"); // Default to Route 1
   const [locationPermission, setLocationPermission] = useState<PermissionState | "unsupported">("prompt");
   const navigate = useNavigate();
+
+  const GBS_TERMINAL = { lat: 32.0722, lng: 72.6861 };
 
   // VIVA-NOTE: Browsers block GPS on non-HTTPS sites. We must warn the user.
   useEffect(() => {
@@ -63,6 +65,17 @@ export default function DriverDashboard() {
 
   const handleLogout = async () => {
     if (isTracking) stopTracking();
+    
+    // Explicit cleanup on logout
+    if (assignedBusId) {
+      const busRef = ref(rtdb, `buses/${assignedBusId}`);
+      await update(busRef, { 
+        status: "inactive",
+        lat: GBS_TERMINAL.lat,
+        lng: GBS_TERMINAL.lng
+      });
+    }
+
     await auth.signOut();
     navigate("/login");
   };
@@ -90,6 +103,14 @@ export default function DriverDashboard() {
             const busRef = ref(rtdb, `buses/${assignedBusId}`);
             const route = SARGODHA_ROUTES.find(r => r.id === assignedRouteId);
             
+            // Set up onDisconnect cleanup inside the first successful position
+            onDisconnect(busRef).update({
+              status: "inactive",
+              lat: GBS_TERMINAL.lat,
+              lng: GBS_TERMINAL.lng,
+              lastUpdated: Date.now()
+            });
+
             set(busRef, {
               id: assignedBusId.toUpperCase(),
               routeId: assignedRouteId,
@@ -125,10 +146,17 @@ export default function DriverDashboard() {
       setWatchId(null);
     }
     
-    // Set status to inactive but keep the marker on map for Admin
+    // Reset to Terminal and set to inactive
     if (assignedBusId) {
       const busRef = ref(rtdb, `buses/${assignedBusId}`);
-      update(busRef, { status: "inactive" });
+      update(busRef, { 
+        status: "inactive",
+        lat: GBS_TERMINAL.lat,
+        lng: GBS_TERMINAL.lng,
+        lastUpdated: Date.now()
+      });
+      // Cancel onDisconnect since we manually cleaned up
+      onDisconnect(busRef).cancel();
     }
 
     setIsTracking(false);

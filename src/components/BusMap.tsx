@@ -113,6 +113,7 @@ const BusMap = ({
   });
 
   const getBusStatus = (bus: Bus) => {
+    if (bus.status === "inactive") return "offline";
     const isOffline = (currentTime - (bus.lastUpdated || 0)) > 60000;
     if (isOffline) return "offline";
     if (bus.speed === 0) return "idle";
