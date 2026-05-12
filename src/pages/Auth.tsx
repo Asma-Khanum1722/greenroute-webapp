@@ -7,8 +7,8 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithRedirect, 
-  getRedirectResult 
+  signInWithPopup,
+  onAuthStateChanged
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
@@ -27,49 +27,56 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Handle Redirect Result
+  // VIVA-NOTE: This "Global Watcher" checks if the user is already logged in
+  // and immediately sends them to the right dashboard. This stops the "Login Loop".
   useEffect(() => {
-    const handleRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          setLoading(true);
-          const user = result.user;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setLoading(true);
+        try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
-          
-          if (!userDoc.exists()) {
-            await setDoc(doc(db, "users", user.uid), {
-              email: user.email,
-              role: "passenger",
-              name: user.displayName || "Passenger",
-              createdAt: new Date().toISOString()
-            });
-            toast.success("Welcome to GreenRoute!");
+          if (userDoc.exists()) {
+            const role = userDoc.data().role;
+            if (role === "admin") navigate("/control");
+            else if (role === "driver") navigate("/driver");
+            else navigate("/passenger");
           }
-
-          const finalDoc = await getDoc(doc(db, "users", user.uid));
-          const role = finalDoc.data()?.role;
-          if (role === "admin") navigate("/control");
-          else if (role === "driver") navigate("/driver");
-          else navigate("/passenger");
+        } catch (err) {
+          console.error("Auth Watcher Error:", err);
+        } finally {
+          setLoading(false);
         }
-      } catch (error: any) {
-        console.error("Redirect Error:", error);
-        toast.error(error.message);
-      } finally {
-        setLoading(false);
       }
-    };
-    handleRedirect();
+    });
+    return () => unsubscribe();
   }, [navigate]);
 
-  // Google Sign-In — uses Redirect for production stability
   const handleGoogleAuth = async () => {
     setLoading(true);
     try {
-      await signInWithRedirect(auth, googleProvider);
+      // Back to Popup — now that domains are authorized, this is the most stable choice
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, "users", user.uid), {
+          email: user.email,
+          role: "passenger",
+          name: user.displayName || "Passenger",
+          createdAt: new Date().toISOString()
+        });
+        toast.success("Welcome to GreenRoute!");
+      }
+      // Navigation is handled by the useEffect "Global Watcher" above
     } catch (error: any) {
-      toast.error(error.message);
+      console.error("Google Auth Error:", error);
+      if (error.code === 'auth/popup-blocked') {
+        toast.error("Please allow popups for this website to log in.");
+      } else {
+        toast.error(error.message);
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -87,15 +94,10 @@ export default function Auth() {
           createdAt: new Date().toISOString()
         });
         toast.success("Account created!");
-        navigate("/passenger");
+        // Navigation is handled by the useEffect "Global Watcher"
       } else {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        const userDoc = await getDoc(doc(db, "users", cred.user.uid));
-        if (!userDoc.exists()) throw new Error("User profile not found.");
-        const userData = userDoc.data();
-        if (userData.role === "admin") navigate("/control");
-        else if (userData.role === "driver") navigate("/driver");
-        else navigate("/passenger");
+        await signInWithEmailAndPassword(auth, email, password);
+        // Navigation is handled by the useEffect "Global Watcher"
       }
     } catch (error: any) {
       toast.error(error.message);
