@@ -7,8 +7,7 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   onAuthStateChanged
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -28,7 +27,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Helper to handle role-based redirection
+  // Unified routing logic
   const handleRouting = async (user: any) => {
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -38,7 +37,6 @@ export default function Auth() {
         else if (role === "driver") navigate("/driver");
         else navigate("/passenger");
       } else {
-        // Auto-provision Google users
         await setDoc(doc(db, "users", user.uid), {
           email: user.email,
           role: "passenger",
@@ -50,27 +48,12 @@ export default function Auth() {
       }
     } catch (err) {
       console.error("Routing Error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 1. Monitor Redirect Result (Essential for mobile/strict browsers)
-  useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          setLoading(true);
-          await handleRouting(result.user);
-        }
-      } catch (err: any) {
-        console.error("Redirect Result Error:", err);
-        // If it fails, the onAuthStateChanged watcher will still try as a backup
-      }
-    };
-    checkRedirect();
-  }, [navigate]);
-
-  // 2. Global Auth State Watcher (The "Session Lock")
+  // Session Watcher
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -82,14 +65,20 @@ export default function Auth() {
   }, [navigate]);
 
   const handleGoogleAuth = async () => {
-    setLoading(true);
+    // NO LOADING STATE HERE - Trigger popup INSTANTLY to bypass blockers
     try {
-      // Redirect mode is the ONLY way to be 100% sure on mobile/custom domains
-      await signInWithRedirect(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user) {
+        setLoading(true); // Now we can show loading while we route
+        await handleRouting(result.user);
+      }
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      toast.error("Auth failed. Please try again or use Email/Password.");
-      setLoading(false);
+      if (error.code === 'auth/popup-blocked') {
+        toast.error("Popup blocked! Please 'Always allow' in your address bar.");
+      } else {
+        toast.error(error.message);
+      }
     }
   };
 
@@ -111,7 +100,6 @@ export default function Auth() {
       }
     } catch (error: any) {
       toast.error(error.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -148,7 +136,7 @@ export default function Auth() {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-10 space-y-4">
               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-primary font-display font-bold animate-pulse">SECURELY LOGGING IN...</p>
+              <p className="text-primary font-display font-bold animate-pulse">VERIFYING ACCOUNT...</p>
             </div>
           ) : (
             <>
@@ -181,7 +169,6 @@ export default function Auth() {
                 <Button
                   type="submit"
                   className="w-full h-12 text-sm mt-2 font-bold tracking-widest"
-                  disabled={loading}
                 >
                   {isSignUp ? "CREATE ACCOUNT" : "SIGN IN"}
                 </Button>
@@ -201,7 +188,6 @@ export default function Auth() {
                     onClick={handleGoogleAuth}
                     variant="secondary"
                     className="w-full h-12 gap-3"
-                    disabled={loading}
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24">
                       <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />

@@ -5,7 +5,7 @@ import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: "greenroute-fyp.firebaseapp.com",
+  authDomain: "greenroute-fyp.web.app",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
