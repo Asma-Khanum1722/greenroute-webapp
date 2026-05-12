@@ -7,7 +7,8 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   onAuthStateChanged
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -27,7 +28,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Unified routing logic
+  // Unified routing logic for production
   const handleRouting = async (user: any) => {
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -37,6 +38,7 @@ export default function Auth() {
         else if (role === "driver") navigate("/driver");
         else navigate("/passenger");
       } else {
+        // Automatically provision profile for new Google users
         await setDoc(doc(db, "users", user.uid), {
           email: user.email,
           role: "passenger",
@@ -48,12 +50,32 @@ export default function Auth() {
       }
     } catch (err) {
       console.error("Routing Error:", err);
+      toast.error("Database connection failed. Please refresh.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Session Watcher
+  // 1. Explicitly catch the redirect result on mount
+  useEffect(() => {
+    const processRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          setLoading(true);
+          await handleRouting(result.user);
+        }
+      } catch (err: any) {
+        console.error("Redirect Process Error:", err);
+        if (err.code !== "auth/web-storage-unsupported") {
+          toast.error("Auth failed. Check if third-party cookies are allowed.");
+        }
+      }
+    };
+    processRedirect();
+  }, [navigate]);
+
+  // 2. Global Auth Watcher as a fallback
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -65,20 +87,14 @@ export default function Auth() {
   }, [navigate]);
 
   const handleGoogleAuth = async () => {
-    // NO LOADING STATE HERE - Trigger popup INSTANTLY to bypass blockers
+    setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
-        setLoading(true); // Now we can show loading while we route
-        await handleRouting(result.user);
-      }
+      // Production mode: Redirect is the only 100% reliable way across all devices
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      if (error.code === 'auth/popup-blocked') {
-        toast.error("Popup blocked! Please 'Always allow' in your address bar.");
-      } else {
-        toast.error(error.message);
-      }
+      toast.error(error.message);
+      setLoading(false);
     }
   };
 
@@ -136,7 +152,8 @@ export default function Auth() {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-10 space-y-4">
               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-primary font-display font-bold animate-pulse">VERIFYING ACCOUNT...</p>
+              <p className="text-primary font-display font-bold animate-pulse">ESTABLISHING SECURE SESSION...</p>
+              <p className="text-white/20 text-[10px] uppercase tracking-widest">Please don't close the window</p>
             </div>
           ) : (
             <>
