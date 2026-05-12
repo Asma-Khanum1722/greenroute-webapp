@@ -7,7 +7,7 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithPopup,
+  signInWithRedirect,
   onAuthStateChanged
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -27,19 +27,30 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // VIVA-NOTE: This "Global Watcher" checks if the user is already logged in
-  // and immediately sends them to the right dashboard. This stops the "Login Loop".
+  // VIVA-NOTE: This "Global Watcher" handles the return from Google Redirect.
+  // It checks if you are logged in, and if your profile is missing, it creates one.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setLoading(true);
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
+          
           if (userDoc.exists()) {
             const role = userDoc.data().role;
             if (role === "admin") navigate("/control");
             else if (role === "driver") navigate("/driver");
             else navigate("/passenger");
+          } else {
+            // NEW USER detected from Google Redirect — Provision account automatically
+            await setDoc(doc(db, "users", user.uid), {
+              email: user.email,
+              role: "passenger",
+              name: user.displayName || "Passenger",
+              createdAt: new Date().toISOString()
+            });
+            toast.success("Welcome to GreenRoute!");
+            navigate("/passenger");
           }
         } catch (err) {
           console.error("Auth Watcher Error:", err);
@@ -52,30 +63,13 @@ export default function Auth() {
   }, [navigate]);
 
   const handleGoogleAuth = async () => {
+    setLoading(true);
     try {
-      // Trigger popup IMMEDIATELY to preserve the "user gesture"
-      const result = await signInWithPopup(auth, googleProvider);
-      setLoading(true);
-      const user = result.user;
-
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          role: "passenger",
-          name: user.displayName || "Passenger",
-          createdAt: new Date().toISOString()
-        });
-        toast.success("Welcome to GreenRoute!");
-      }
+      // Switch to Redirect — This is the only 100% stable way on Vercel
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      if (error.code === 'auth/popup-blocked') {
-        toast.error("Popup blocked! Please click the icon in your address bar and 'Always allow'.");
-      } else {
-        toast.error(error.message);
-      }
-    } finally {
+      toast.error(error.message);
       setLoading(false);
     }
   };
@@ -93,10 +87,8 @@ export default function Auth() {
           createdAt: new Date().toISOString()
         });
         toast.success("Account created!");
-        // Navigation is handled by the useEffect "Global Watcher"
       } else {
         await signInWithEmailAndPassword(auth, email, password);
-        // Navigation is handled by the useEffect "Global Watcher"
       }
     } catch (error: any) {
       toast.error(error.message);

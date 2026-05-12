@@ -5,8 +5,7 @@ import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  // Using the production URL here prevents the "Double Popup" blocking issue
-  authDomain: "greenroutepk.vercel.app",
+  authDomain: "greenroute-fyp.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
