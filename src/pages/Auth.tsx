@@ -52,10 +52,10 @@ export default function Auth() {
   }, [navigate]);
 
   const handleGoogleAuth = async () => {
-    setLoading(true);
     try {
-      // Back to Popup — now that domains are authorized, this is the most stable choice
+      // Trigger popup IMMEDIATELY to preserve the "user gesture"
       const result = await signInWithPopup(auth, googleProvider);
+      setLoading(true);
       const user = result.user;
 
       const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -68,11 +68,10 @@ export default function Auth() {
         });
         toast.success("Welcome to GreenRoute!");
       }
-      // Navigation is handled by the useEffect "Global Watcher" above
     } catch (error: any) {
       console.error("Google Auth Error:", error);
       if (error.code === 'auth/popup-blocked') {
-        toast.error("Please allow popups for this website to log in.");
+        toast.error("Popup blocked! Please click the icon in your address bar and 'Always allow'.");
       } else {
         toast.error(error.message);
       }
