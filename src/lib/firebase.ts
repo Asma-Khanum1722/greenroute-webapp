@@ -4,13 +4,14 @@ import { getFirestore } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDwtQ7X3JWp3za5eqybo60Wq0jCMqGlkt0",
-  authDomain: "greenroute-fyp.firebaseapp.com",
-  projectId: "greenroute-fyp",
-  databaseURL: "https://greenroute-fyp-default-rtdb.firebaseio.com",
-  storageBucket: "greenroute-fyp.firebasestorage.app",
-  messagingSenderId: "955439154863",
-  appId: "1:955439154863:web:aa4a25227670a5ac65b65a"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  // Using the production URL here prevents the "Double Popup" blocking issue
+  authDomain: "greenroutepk.vercel.app",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
