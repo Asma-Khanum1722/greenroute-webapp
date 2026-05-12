@@ -7,7 +7,8 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   onAuthStateChanged
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -27,53 +28,68 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Global Auth Watcher - handles navigation and auto-provisioning
+  // Helper to handle role-based redirection
+  const handleRouting = async (user: any) => {
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const role = userDoc.data().role;
+        if (role === "admin") navigate("/control");
+        else if (role === "driver") navigate("/driver");
+        else navigate("/passenger");
+      } else {
+        // Auto-provision Google users
+        await setDoc(doc(db, "users", user.uid), {
+          email: user.email,
+          role: "passenger",
+          name: user.displayName || "Passenger",
+          createdAt: new Date().toISOString()
+        });
+        toast.success("Welcome to GreenRoute!");
+        navigate("/passenger");
+      }
+    } catch (err) {
+      console.error("Routing Error:", err);
+    }
+  };
+
+  // 1. Monitor Redirect Result (Essential for mobile/strict browsers)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          setLoading(true);
+          await handleRouting(result.user);
+        }
+      } catch (err: any) {
+        console.error("Redirect Result Error:", err);
+        // If it fails, the onAuthStateChanged watcher will still try as a backup
+      }
+    };
+    checkRedirect();
+  }, [navigate]);
+
+  // 2. Global Auth State Watcher (The "Session Lock")
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setLoading(true);
-        try {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            const role = userDoc.data().role;
-            if (role === "admin") navigate("/control");
-            else if (role === "driver") navigate("/driver");
-            else navigate("/passenger");
-          } else {
-            // Create user profile if missing (common for Google first-time users)
-            await setDoc(doc(db, "users", user.uid), {
-              email: user.email,
-              role: "passenger",
-              name: user.displayName || "Passenger",
-              createdAt: new Date().toISOString()
-            });
-            toast.success("Welcome to GreenRoute!");
-            navigate("/passenger");
-          }
-        } catch (err) {
-          console.error("Auth Watcher Error:", err);
-        } finally {
-          setLoading(false);
-        }
+        handleRouting(user);
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
   const handleGoogleAuth = async () => {
+    setLoading(true);
     try {
-      // Direct popup - with our vercel.json proxy, this is now first-party and stable
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
-        setLoading(true); // Watcher takes over from here
-      }
+      // Redirect mode is the ONLY way to be 100% sure on mobile/custom domains
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      if (error.code === 'auth/popup-blocked') {
-        toast.error("Please allow popups for this site once.");
-      } else {
-        toast.error(error.message);
-      }
+      toast.error("Auth failed. Please try again or use Email/Password.");
+      setLoading(false);
     }
   };
 
@@ -95,6 +111,7 @@ export default function Auth() {
       }
     } catch (error: any) {
       toast.error(error.message);
+    } finally {
       setLoading(false);
     }
   };
@@ -131,7 +148,7 @@ export default function Auth() {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-10 space-y-4">
               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-primary font-display font-bold animate-pulse">SYNCING SESSION...</p>
+              <p className="text-primary font-display font-bold animate-pulse">SECURELY LOGGING IN...</p>
             </div>
           ) : (
             <>
