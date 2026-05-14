@@ -3,7 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Bell, Star, Navigation, Clock, Info } from "lucide-react";
+import { MapPin, Bell, Star, Navigation, Clock, Info, Lock } from "lucide-react";
 import BusMap from "@/components/BusMap";
 import { motion, AnimatePresence } from "framer-motion";
 import { rtdb, auth, db } from "@/lib/firebase";
@@ -24,6 +24,22 @@ export default function PassengerDashboard() {
   const [targetStop, setTargetStop] = useState<any>(null);
   const [liveBuses, setLiveBuses] = useState<any[]>([]);
   const [calcETA, setCalcETA] = useState<((bus: any) => string) | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Track login state for feature-gating
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((user) => {
+      setIsLoggedIn(!!user);
+      if (user) {
+        getDoc(doc(db, "users", user.uid)).then((d) => {
+          if (d.exists()) setUserName(d.data().name);
+        });
+      } else {
+        setUserName("");
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const filteredBuses = liveBuses.filter(bus => 
     selectedRoute === "all" || bus.routeId === selectedRoute
@@ -43,22 +59,12 @@ export default function PassengerDashboard() {
   };
 
   useEffect(() => {
-    // 1. Get Passenger's Real GPS Location (and keep watching it)
+    // 1. Get Passenger's Real GPS Location
     const geoWatchId = navigator.geolocation.watchPosition((pos) => {
       setUserLocation([pos.coords.latitude, pos.coords.longitude]);
     }, null, { enableHighAccuracy: true });
 
-    // 2. Fetch User Profile
-    const fetchProfile = async () => {
-      if (auth.currentUser) {
-        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-        if (userDoc.exists()) {
-          setUserName(userDoc.data().name);
-        }
-      }
-    };
-
-    // 3. Monitor Buses & Proximity
+    // 2. Monitor Buses & Proximity
     const busesRef = ref(rtdb, "buses");
     const unsub = onValue(busesRef, (snapshot) => {
       const data = snapshot.val();
@@ -67,24 +73,19 @@ export default function PassengerDashboard() {
         const activeCount = busList.filter((b: any) => b.status === "active").length;
         setActiveBuses(activeCount);
 
-        // PROXIMITY CHECK:
-        // We check against the passenger's REAL GPS location — this means the alert
-        // fires when any active bus gets within 500m of wherever the passenger is standing.
-        // Works anywhere — university, street, market — no hardcoded stops needed.
         if (isNotificationsEnabled) {
           setUserLocation(currentLoc => {
             if (!currentLoc) return currentLoc;
             busList.forEach(bus => {
               if (bus.status === "active") {
                 const dist = calculateDistance(currentLoc[0], currentLoc[1], bus.lat, bus.lng);
-                // 500m threshold
                 if (dist < 0.5) {
                   new Notification("GreenRoute Alert 🚌", {
                     body: `Bus ${bus.id} is only ${Math.round(dist * 1000)}m away — head to your stop!`,
                     icon: "/favicon.ico"
                   });
                   toast.success(`Bus ${bus.id} is ${Math.round(dist * 1000)}m away!`, { icon: "🚌" });
-                  setIsNotificationsEnabled(false); // prevent spam
+                  setIsNotificationsEnabled(false);
                 }
               }
             });
@@ -94,7 +95,6 @@ export default function PassengerDashboard() {
       }
     });
 
-    fetchProfile();
     return () => {
       unsub();
       navigator.geolocation.clearWatch(geoWatchId);
@@ -284,7 +284,7 @@ export default function PassengerDashboard() {
               </CardContent>
             </Card>
 
-            {/* Quick Alert Card */}
+            {/* Arrival Alerts Card */}
             <Card className="border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors duration-500 overflow-hidden relative group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <Bell className="w-24 h-24 rotate-12" />
@@ -293,67 +293,91 @@ export default function PassengerDashboard() {
                 <CardTitle className="flex items-center gap-2">
                   <Bell className="w-5 h-5 text-primary" />
                   Arrival Alerts
+                  {!isLoggedIn && <Lock className="w-3.5 h-3.5 text-white/30 ml-auto" />}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Never miss your bus again. Get notified automatically when your selected vehicle is 500 metres away.
+                  Never miss your bus again. Get notified automatically when your bus is 500 metres away.
                 </p>
-                <Button 
-                  onClick={requestNotificationPermission}
-                  variant={isNotificationsEnabled ? "secondary" : "default"}
-                  className="w-full gap-2 font-bold h-12 rounded-xl transition-all"
-                >
-                  <Navigation className="w-4 h-4" />
-                  {isNotificationsEnabled ? (targetStop ? `MONITORING: ${targetStop.name}` : "SELECT A STOP ON MAP") : "ENABLE PROXIMITY ALERTS"}
-                </Button>
-                {targetStop && (
-                  <p className="text-[10px] text-primary text-center font-bold animate-pulse">
-                    Watching for buses near {targetStop.name}...
-                  </p>
+                {isLoggedIn ? (
+                  <>
+                    <Button 
+                      onClick={requestNotificationPermission}
+                      variant={isNotificationsEnabled ? "secondary" : "default"}
+                      className="w-full gap-2 font-bold h-12 rounded-xl transition-all"
+                    >
+                      <Navigation className="w-4 h-4" />
+                      {isNotificationsEnabled ? (targetStop ? `MONITORING: ${targetStop.name}` : "SELECT A STOP ON MAP") : "ENABLE PROXIMITY ALERTS"}
+                    </Button>
+                    {targetStop && (
+                      <p className="text-[10px] text-primary text-center font-bold animate-pulse">
+                        Watching for buses near {targetStop.name}...
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 py-2">
+                    <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                      <Lock className="w-4 h-4 text-white/30" />
+                    </div>
+                    <p className="text-[11px] text-white/40 text-center">Sign in to enable proximity alerts</p>
+                    <button
+                      onClick={() => navigate("/login?portal=passenger")}
+                      className="text-[11px] font-bold text-primary hover:underline transition-all"
+                    >
+                      Sign In →
+                    </button>
+                  </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Favorite Stops Card */}
+            {/* Favorite Terminals Card */}
             <Card className="border-white/5 glass-card">
               <CardHeader className="py-3">
                 <CardTitle className="text-sm flex items-center gap-2 font-display uppercase tracking-widest">
                   <Star className="w-4 h-4 text-yellow-500" />
                   Terminals
+                  {!isLoggedIn && <Lock className="w-3.5 h-3.5 text-white/30 ml-auto" />}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 px-3 pb-3">
-                {routes.slice(0, 5).map((route, i) => {
-                  const terminal = route.stops[route.stops.length - 1];
-                  return (
-                    <div 
-                      key={i} 
-                      onClick={() => {
-                        if (!auth.currentUser) {
-                          toast.error("Sign in required", {
-                            description: "Login to save your favorite stops and terminals.",
-                            action: {
-                              label: "Login",
-                              onClick: () => navigate("/login?portal=passenger")
-                            }
-                          });
-                          return;
-                        }
-                        setTargetStop(terminal);
-                      }}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:border-primary/20 transition-all cursor-pointer group"
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold group-hover:text-primary transition-colors truncate max-w-[140px]">{terminal.name}</span>
-                        <span className="text-[9px] text-muted-foreground mt-0.5">ETA: {Math.floor(Math.random() * 15) + 5} min</span>
-                      </div>
-                      <Star className={`w-3.5 h-3.5 transition-colors ${targetStop?.id === terminal.id ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground/30 group-hover:text-yellow-500'}`} />
+                {!isLoggedIn ? (
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                      <Lock className="w-4 h-4 text-white/30" />
                     </div>
-                  );
-                })}
-                </CardContent>
-              </Card>
+                    <p className="text-[11px] text-white/40 text-center">Sign in to save favourite terminals</p>
+                    <button
+                      onClick={() => navigate("/login?portal=passenger")}
+                      className="text-[11px] font-bold text-primary hover:underline transition-all"
+                    >
+                      Sign In →
+                    </button>
+                  </div>
+                ) : (
+                  routes.slice(0, 5).map((route, i) => {
+                    const terminal = route.stops[route.stops.length - 1];
+                    return (
+                      <div 
+                        key={i} 
+                        onClick={() => setTargetStop(terminal)}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:border-primary/20 transition-all cursor-pointer group"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-bold group-hover:text-primary transition-colors truncate max-w-[140px]">{terminal.name}</span>
+                          <span className="text-[9px] text-muted-foreground mt-0.5">
+                            {calcETA ? calcETA({ lat: terminal.lat, lng: terminal.lng, speed: 0, id: '', heading: 0, status: '' } as any) : '—'}
+                          </span>
+                        </div>
+                        <Star className={`w-3.5 h-3.5 transition-colors ${targetStop?.id === terminal.id ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground/30 group-hover:text-yellow-500'}`} />
+                      </div>
+                    );
+                  })
+                )}
+              </CardContent>
+            </Card>
             </motion.div>
           )}
         </AnimatePresence>

@@ -48,7 +48,7 @@ export const ProtectedRoute = ({ children, allowedRole }: ProtectedRouteProps) =
 
   if (allowedRole && userRole !== allowedRole) {
     const redirectMap: Record<string, string> = {
-      admin: "/admin",
+      admin: "/control",
       driver: "/driver",
       passenger: "/passenger"
     };

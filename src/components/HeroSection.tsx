@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { Navigation } from "lucide-react";
 import { Button } from "./ui/button";
+import { useNavigate } from "react-router-dom";
 
 export const HeroSection = () => {
+  const navigate = useNavigate();
   return (
     <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-[#020617]">
       {/* Official Fleet Background Image */}
@@ -50,11 +52,11 @@ export const HeroSection = () => {
           >
             <Button
               size="lg"
-              className="px-12 py-8"
-              onClick={() => document.getElementById('live-map')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-12 py-8 gap-3 group"
+              onClick={() => navigate('/passenger')}
             >
-              Explore Map
-              <ArrowRight className="w-5 h-5 ml-3 transition-transform duration-500 group-hover:translate-x-2" />
+              <Navigation className="w-5 h-5 transition-transform duration-300 group-hover:rotate-12" />
+              Track My Bus
             </Button>
           </motion.div>
         </div>

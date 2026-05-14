@@ -111,14 +111,14 @@ export const FleetManager = () => {
           >
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${
-                bus.status === 'online' ? 'bg-primary/20 border-primary/30' : 'bg-white/5 border-white/10'
+                bus.status === 'active' ? 'bg-primary/20 border-primary/30' : 'bg-white/5 border-white/10'
               }`}>
-                <Bus className={`w-5 h-5 ${bus.status === 'online' ? 'text-primary' : 'text-white/20'}`} />
+                <Bus className={`w-5 h-5 ${bus.status === 'active' ? 'text-primary' : 'text-white/20'}`} />
               </div>
               <div>
                 <p className="text-sm font-bold text-white">{bus.id}</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${bus.status === 'online' ? 'bg-primary animate-pulse' : 'bg-white/20'}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${bus.status === 'active' ? 'bg-primary animate-pulse' : 'bg-white/20'}`} />
                   <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{bus.status}</p>
                 </div>
               </div>

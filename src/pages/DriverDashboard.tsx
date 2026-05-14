@@ -27,7 +27,7 @@ export default function DriverDashboard() {
   const [watchId, setWatchId] = useState<number | null>(null);
   const [driverName, setDriverName] = useState<string>("");
   const [assignedBusId, setAssignedBusId] = useState<string | null>(null);
-  const [assignedRouteId, setAssignedRouteId] = useState<string>("bhalwal"); // Default to Route 1
+  const [assignedRouteId, setAssignedRouteId] = useState<string>("r1"); // Default to R1 Bhera Express
   const [locationPermission, setLocationPermission] = useState<PermissionState | "unsupported">("prompt");
   const navigate = useNavigate();
 

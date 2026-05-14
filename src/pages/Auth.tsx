@@ -7,8 +7,7 @@ import { auth, db, googleProvider } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   onAuthStateChanged
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -56,26 +55,7 @@ export default function Auth() {
     }
   };
 
-  // 1. Explicitly catch the redirect result on mount
-  useEffect(() => {
-    const processRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          setLoading(true);
-          await handleRouting(result.user);
-        }
-      } catch (err: any) {
-        console.error("Redirect Process Error:", err);
-        if (err.code !== "auth/web-storage-unsupported") {
-          toast.error("Auth failed. Check if third-party cookies are allowed.");
-        }
-      }
-    };
-    processRedirect();
-  }, [navigate]);
-
-  // 2. Global Auth Watcher as a fallback
+  // Auth State Watcher — handles routing after any sign-in method
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -89,11 +69,18 @@ export default function Auth() {
   const handleGoogleAuth = async () => {
     setLoading(true);
     try {
-      // Production mode: Redirect is the only 100% reliable way across all devices
-      await signInWithRedirect(auth, googleProvider);
+      // signInWithPopup works reliably across all browsers & deployment platforms
+      await signInWithPopup(auth, googleProvider);
+      // onAuthStateChanged will fire and call handleRouting automatically
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      toast.error(error.message);
+      if (error.code === "auth/unauthorized-domain") {
+        toast.error("Domain not authorized. Add this domain in Firebase Console → Authentication → Authorized Domains.");
+      } else if (error.code === "auth/popup-closed-by-user") {
+        toast.info("Sign-in cancelled.");
+      } else {
+        toast.error(error.message);
+      }
       setLoading(false);
     }
   };
