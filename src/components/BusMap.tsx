@@ -126,8 +126,15 @@ const BusMap = ({
     const dLat = (target.lat - bus.lat) * Math.PI / 180;
     const dLon = (target.lng - bus.lng) * Math.PI / 180;
     const a = Math.sin(dLat/2)**2 + Math.cos(bus.lat * Math.PI/180) * Math.cos(target.lat * Math.PI/180) * Math.sin(dLon/2)**2;
-    const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const mins = Math.max(1, Math.round((distance / speed) * 60));
+    
+    // Calculate straight-line distance in km
+    const straightLineDistance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    
+    // Apply Urban Tortuosity Factor (1.35) to estimate actual road distance
+    const TORTUOSITY_FACTOR = 1.35;
+    const roadDistance = straightLineDistance * TORTUOSITY_FACTOR;
+    
+    const mins = Math.max(1, Math.round((roadDistance / speed) * 60));
     return `${mins} mins`;
   };
 

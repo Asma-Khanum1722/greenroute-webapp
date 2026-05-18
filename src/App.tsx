@@ -15,6 +15,7 @@ import { Navigate } from "react-router-dom";
 import AdminOverview from "@/pages/admin/AdminOverview";
 import AdminRoutes from "./pages/admin/AdminRoutes";
 import AdminFleet from "@/pages/admin/AdminFleet";
+import AdminDrivers from "@/pages/admin/AdminDrivers";
 import AdminTelemetry from "@/pages/admin/AdminTelemetry";
 
 import { ChatWidget } from "@/components/ChatWidget";
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="overview" element={<AdminOverview />} />
             <Route path="routes" element={<AdminRoutes />} />
             <Route path="fleet" element={<AdminFleet />} />
+            <Route path="drivers" element={<AdminDrivers />} />
             <Route path="telemetry" element={<AdminTelemetry />} />
           </Route>
           <Route 

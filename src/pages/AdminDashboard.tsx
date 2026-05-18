@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { LayoutGrid, Bus, Activity, Database, ShieldCheck, ChevronRight, Menu, MapPin } from "lucide-react";
+import { LayoutGrid, Bus, Activity, Database, ShieldCheck, ChevronRight, Menu, MapPin, UserCheck } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -33,6 +33,7 @@ export default function AdminDashboard() {
     { icon: <LayoutGrid className="w-5 h-5" />, label: "Overview", path: "/control/overview" },
     { icon: <MapPin className="w-5 h-5" />, label: "Route Manager", path: "/control/routes" },
     { icon: <Bus className="w-5 h-5" />, label: "Fleet Manager", path: "/control/fleet" },
+    { icon: <UserCheck className="w-5 h-5" />, label: "Driver Manager", path: "/control/drivers" },
     { icon: <Activity className="w-5 h-5" />, label: "Live Telemetry", path: "/control/telemetry" },
   ];
 
