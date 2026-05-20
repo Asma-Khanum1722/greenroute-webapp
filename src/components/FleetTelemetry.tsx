@@ -3,6 +3,7 @@ import { rtdb } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bus, User, Navigation, Gauge, Activity } from "lucide-react";
+import { useDemo } from "@/lib/DemoContext";
 
 interface BusData {
   id: string;
@@ -14,26 +15,48 @@ interface BusData {
   lastUpdated: number;
 }
 
+const isActuallyActive = (bus: any, isDemoMode = false) => {
+  if (bus.status === "inactive") return false;
+  if ((Date.now() - (bus.lastUpdated || 0)) > 60000) return false;
+  if (!bus.lat || !bus.lng) return false;
+  if (bus.lat < 23 || bus.lat > 37) return false;
+  if (bus.lng < 60 || bus.lng > 77) return false;
+  if (!isDemoMode && !bus.driverEmail) return false;
+  return true;
+};
+
 export default function FleetTelemetry() {
   const [buses, setBuses] = useState<BusData[]>([]);
+  const { isDemoMode, buses: demoBuses } = useDemo();
 
   // VIVA-EXPLANATION: We use 'onValue' to create a real-time listener.
   // This is much more efficient than 'polling' the database every few seconds.
   useEffect(() => {
+    if (isDemoMode) {
+      setBuses([...demoBuses].sort((a, b) => a.id.localeCompare(b.id)));
+      return;
+    }
+
     const busesRef = ref(rtdb, "buses");
     const unsubscribe = onValue(busesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const busList = Object.entries(data).map(([_, value]: [string, any]) => ({
-          ...value
-        }));
+        const busList = Object.entries(data)
+          .map(([key, value]: [string, any]) => ({
+            ...value,
+            id: value.id || key.toUpperCase() // Fallback to database key uppercase
+          }))
+          .filter(bus => bus.id && bus.id !== "undefined");
+        
         // Sort by ID to keep the table stable
-        setBuses(busList.sort((a, b) => a.id.localeCompare(b.id)));
+        setBuses(busList.sort((a, b) => (a.id || "").localeCompare(b.id || "")));
+      } else {
+        setBuses([]);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isDemoMode, demoBuses]);
 
   const formatTimeAgo = (timestamp: number) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -100,9 +123,15 @@ export default function FleetTelemetry() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${bus.status === 'active' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
-                      {bus.status}
-                    </span>
+                    {isActuallyActive(bus, isDemoMode) ? (
+                      <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        {bus.status}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                        OFFLINE
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right font-mono text-[10px] text-muted-foreground">
                     {formatTimeAgo(bus.lastUpdated)}

@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { rtdb } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
-import { useRoutes } from "@/lib/routes";
+import { useRoutes, getRouteDistanceAndETA, calculateDistance, getRouteAverageSpeed } from "@/lib/routes";
 import { Button } from "./ui/button";
 import { Maximize } from "lucide-react";
+
+import { useDemo } from "@/lib/DemoContext";
 
 // Fix for default marker icons in Leaflet with React
 // @ts-ignore
@@ -49,8 +51,10 @@ interface BusMapProps {
   className?: string;
   selectedRoute?: string;
   targetStop?: any;  // The stop selected by user
+  destinationStop?: any;
   onSelectStop?: (stop: any) => void;
-  onBusesUpdate?: (buses: Bus[], calcETA: (bus: Bus) => string) => void;
+  onSelectDestinationStop?: (stop: any) => void;
+  onBusesUpdate?: (buses: Bus[], calcETA: (bus: Bus, target?: { lat: number, lng: number }) => string) => void;
 }
 
 function MapController({ center, zoom }: { center: [number, number], zoom: number }) {
@@ -71,25 +75,44 @@ function MapController({ center, zoom }: { center: [number, number], zoom: numbe
   );
 }
 
+const isActuallyActive = (bus: any, isDemoMode = false) => {
+  if (bus.status === "inactive") return false;
+  if ((Date.now() - (bus.lastUpdated || 0)) > 60000) return false;
+  if (!bus.lat || !bus.lng) return false;
+  if (bus.lat < 23 || bus.lat > 37) return false;
+  if (bus.lng < 60 || bus.lng > 77) return false;
+  if (!isDemoMode && !bus.driverEmail) return false;
+  return true;
+};
+
 const BusMap = ({ 
-  center = [32.0732, 72.6713], 
+  center = [32.0755605, 72.6976644], 
   zoom = 11, 
   showInactive = false, 
   selectedRoute = "all",
   targetStop = null,
+  destinationStop = null,
   onSelectStop,
+  onSelectDestinationStop,
   onBusesUpdate
 }: BusMapProps) => {
   const routes = useRoutes();
+  const { isDemoMode, buses: demoBuses } = useDemo();
   const [buses, setBuses] = useState<Bus[]>([]);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [mapStyle] = useState<"voyager">("voyager");
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(Date.now()), 10000);
-    return () => clearInterval(timer);
+    const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
+    if (isDemoMode) {
+      setBuses(demoBuses);
+      return;
+    }
+
     const busesRef = ref(rtdb, "buses");
     const unsubscribe = onValue(busesRef, (snapshot) => {
       const data = snapshot.val();
@@ -103,38 +126,41 @@ const BusMap = ({
     });
 
     return () => unsubscribe();
-  }, [showInactive, selectedRoute]);
+  }, [showInactive, selectedRoute, isDemoMode, demoBuses]);
 
   const activeRoute = routes.find(r => r.id === selectedRoute);
   
-  const filteredBuses = buses.filter(bus => {
-    if (selectedRoute === "all") return true;
-    return bus.routeId === selectedRoute;
-  });
+  const filteredBuses = useMemo(() => {
+    return buses.filter(bus => {
+      if (!bus.id || bus.id === "undefined" || !bus.lat || !bus.lng) return false;
+      if (!showInactive && !isActuallyActive(bus, isDemoMode)) return false;
+      if (selectedRoute === "all") return true;
+      return bus.routeId === selectedRoute;
+    });
+  }, [buses, showInactive, selectedRoute, isDemoMode]);
 
   const getBusStatus = (bus: Bus) => {
-    if (bus.status === "inactive") return "offline";
-    const isOffline = (currentTime - (bus.lastUpdated || 0)) > 60000;
-    if (isOffline) return "offline";
+    if (!isActuallyActive(bus, isDemoMode)) return "offline";
     if (bus.speed === 0) return "idle";
     return "active";
   };
 
-  const calculateETA = (bus: Bus, target: { lat: number, lng: number }) => {
-    const speed = bus.speed > 0 ? bus.speed : 25;
-    const R = 6371;
-    const dLat = (target.lat - bus.lat) * Math.PI / 180;
-    const dLon = (target.lng - bus.lng) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(bus.lat * Math.PI/180) * Math.cos(target.lat * Math.PI/180) * Math.sin(dLon/2)**2;
-    
-    // Calculate straight-line distance in km
-    const straightLineDistance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    
-    // Apply Urban Tortuosity Factor (1.35) to estimate actual road distance
-    const TORTUOSITY_FACTOR = 1.35;
-    const roadDistance = straightLineDistance * TORTUOSITY_FACTOR;
-    
-    const mins = Math.max(1, Math.round((roadDistance / speed) * 60));
+  const calculateETA = (bus: Bus, target: { lat: number, lng: number; id?: string }) => {
+    const route = routes.find(r => r.id === bus.routeId);
+    if (route && route.stops && route.stops.length > 0) {
+      // Find matching stop on route
+      const stop = route.stops.find(s => s.id === target.id || (Math.abs(s.lat - target.lat) < 0.0001 && Math.abs(s.lng - target.lng) < 0.0001));
+      if (stop) {
+        const calcs = getRouteDistanceAndETA(bus, stop, route);
+        return `${calcs.etaMinutes} mins`;
+      }
+    }
+
+    // Fallback to straight-line distance and route-smoothed speed
+    const rawDist = calculateDistance(bus.lat, bus.lng, target.lat, target.lng);
+    const avgSpeed = getRouteAverageSpeed(bus.routeId || "");
+    const speed = bus.speed > 10 ? (bus.speed * 0.7 + avgSpeed * 0.3) : avgSpeed;
+    const mins = Math.max(1, Math.round((rawDist / speed) * 60));
     return `${mins} mins`;
   };
 
@@ -152,8 +178,13 @@ const BusMap = ({
   };
 
   useEffect(() => {
-    if (onBusesUpdate) onBusesUpdate(filteredBuses, (bus) => calculateETA(bus, targetStop || routes[0].stops[routes[0].stops.length-1]));
-  }, [filteredBuses.length, selectedRoute]);
+    if (onBusesUpdate) {
+      onBusesUpdate(filteredBuses, (bus, customTarget) => {
+        const fallbackStop = routes[0]?.stops?.[routes[0]?.stops?.length - 1] || { lat: 32.0755605, lng: 72.6976644, id: "gbs", name: "GBS Sargodha" };
+        return calculateETA(bus, customTarget || targetStop || fallbackStop);
+      });
+    }
+  }, [filteredBuses, selectedRoute, targetStop, routes, onBusesUpdate]);
 
   const [isInteracting, setIsInteracting] = useState(false);
 
@@ -170,6 +201,7 @@ const BusMap = ({
           </div>
         </div>
       )}
+      
       <MapContainer 
         center={center} 
         zoom={zoom} 
@@ -178,21 +210,21 @@ const BusMap = ({
         className="h-full w-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; Google Maps'
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         />
 
         <MapController center={center} zoom={zoom} />
 
         {/* Permanent City Landmarks for Context */}
         {[
-          { name: "GBS Sargodha", lat: 32.0732, lng: 72.6713 },
-          { name: "University of Sargodha", lat: 32.0545, lng: 72.6955 },
-          { name: "DHQ Hospital", lat: 32.0784, lng: 72.6801 },
-          { name: "Satellite Town", lat: 32.0621, lng: 72.7051 },
-          { name: "47 Pull", lat: 32.0456, lng: 72.6543 },
+          { name: "GBS Sargodha", lat: 32.0755605, lng: 72.6976644 },
+          { name: "University of Sargodha", lat: 32.0728424, lng: 72.684187 },
+          { name: "DHQ Hospital", lat: 32.0817926, lng: 72.6629141 },
+          { name: "Satellite Town Chowk", lat: 32.0849, lng: 72.6889 },
+          { name: "47 Pull", lat: 32.0495, lng: 72.6534 },
           { name: "Trust Plaza", lat: 32.0754, lng: 72.6743 },
-          { name: "PAF Colony", lat: 32.0432, lng: 72.6789 },
+          { name: "PAF Colony", lat: 32.0512, lng: 72.6543 },
           { name: "Kirana Hills", lat: 32.0123, lng: 72.6234 }
         ].map((poi, idx) => (
           <Marker 
@@ -214,44 +246,234 @@ const BusMap = ({
         {routes.map(route => (
           <Polyline 
             key={route.id}
-            positions={route.stops.map(s => [s.lat, s.lng] as [number, number])} 
+            positions={route.path || (route.stops ? route.stops.map(s => [s.lat, s.lng] as [number, number]) : [])} 
             color={route.color} 
             weight={4} 
             opacity={selectedRoute === "all" || selectedRoute === route.id ? 0.8 : 0.1}
           />
         ))}
 
-        {/* Selected Route Stop Dots */}
-        {activeRoute && activeRoute.stops.map((stop) => (
-          <Marker 
-            key={stop.id} 
-            position={[stop.lat, stop.lng]} 
-            icon={L.divIcon({
-              className: "stop-dot",
-              html: `<div style="background-color: ${activeRoute.color}; width: 12px; height: 12px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
-              iconSize: [12, 12],
-              iconAnchor: [6, 6],
-            })}
-          >
-            <Popup>
-              <div className="p-3 text-center min-w-[160px]">
-                <div className="font-bold text-sm mb-1">{stop.name}</div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">Transit Stop</div>
-                <div className="bg-primary/5 rounded-lg p-2 mb-3 border border-primary/10">
-                  <div className="text-[9px] text-primary font-bold uppercase mb-0.5">Next Arrival</div>
-                  <div className="text-lg font-display font-bold text-primary">{getNextArrival(stop)}</div>
-                </div>
-                <Button 
-                  size="sm"
-                  className="w-full h-8 text-[9px]"
-                  onClick={() => onSelectStop && onSelectStop(stop)}
+        {/* Selected Trip Path Highlight */}
+        {activeRoute && targetStop && destinationStop && (() => {
+          const idxA = activeRoute.stops ? activeRoute.stops.findIndex((s: any) => s.id === targetStop.id) : -1;
+          const idxB = activeRoute.stops ? activeRoute.stops.findIndex((s: any) => s.id === destinationStop.id) : -1;
+          if (idxA !== -1 && idxB !== -1 && activeRoute.stops) {
+            const min = Math.min(idxA, idxB);
+            const max = Math.max(idxA, idxB);
+            const pathStops = activeRoute.stops.slice(min, max + 1);
+            return (
+              <Polyline 
+                positions={pathStops.map((s: any) => [s.lat, s.lng] as [number, number])}
+                color="#3b82f6" // Electric blue path highlight
+                weight={7}
+                opacity={0.9}
+                dashArray="10, 10"
+              />
+            );
+          }
+          return null;
+        })()}
+
+        {/* Route Stop Markers */}
+        {selectedRoute === "all"
+          ? routes.flatMap(route =>
+              route.stops ? route.stops.map((stop) => {
+                const isBoarding = targetStop?.id === stop.id;
+                const isDestination = destinationStop?.id === stop.id;
+                
+                let iconHtml = `<div style="background-color: ${route.color}; width: 8px; height: 8px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); opacity: 0.7;"></div>`;
+                let iconSz: [number, number] = [8, 8];
+                let iconAnch: [number, number] = [4, 4];
+                
+                if (isBoarding) {
+                  iconHtml = `
+                    <div class="relative flex items-center justify-center w-6 h-6">
+                      <div class="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-45"></div>
+                      <div class="absolute inset-1 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-lg">
+                        <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                      </div>
+                    </div>
+                  `;
+                  iconSz = [24, 24];
+                  iconAnch = [12, 12];
+                } else if (isDestination) {
+                  iconHtml = `
+                    <div class="relative flex items-center justify-center w-6 h-6">
+                      <div class="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-45"></div>
+                      <div class="absolute inset-1 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center shadow-lg">
+                        <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                      </div>
+                    </div>
+                  `;
+                  iconSz = [24, 24];
+                  iconAnch = [12, 12];
+                }
+
+                return (
+                  <Marker 
+                    key={stop.id} 
+                    position={[stop.lat, stop.lng]} 
+                    icon={L.divIcon({
+                      className: "stop-dot",
+                      html: iconHtml,
+                      iconSize: iconSz,
+                      iconAnchor: iconAnch,
+                    })}
+                  >
+                    <Popup>
+                      <div className="p-3 text-center min-w-[180px]">
+                        <div className="font-bold text-sm mb-1">{stop.name}</div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Transit Stop</div>
+                        <div className="text-[9px] font-bold mb-3 px-2 py-1 rounded-full inline-block" style={{ backgroundColor: `${route.color}20`, color: route.color }}>
+                          {route.name}
+                        </div>
+                        
+                        <div className="flex flex-col gap-1.5">
+                          {isBoarding ? (
+                            <Button 
+                              size="sm"
+                              variant="destructive"
+                              className="w-full h-8 text-[9px] uppercase font-bold"
+                              onClick={() => onSelectStop && onSelectStop(null)}
+                            >
+                              Remove Boarding Stop
+                            </Button>
+                          ) : (
+                            <Button 
+                              size="sm"
+                              className="w-full h-8 text-[9px] uppercase font-bold"
+                              onClick={() => onSelectStop && onSelectStop(stop)}
+                            >
+                              Set As Boarding Stop
+                            </Button>
+                          )}
+                          
+                          {isDestination ? (
+                            <Button 
+                              size="sm"
+                              variant="destructive"
+                              className="w-full h-8 text-[9px] uppercase font-bold"
+                              onClick={() => onSelectDestinationStop && onSelectDestinationStop(null)}
+                            >
+                              Remove Destination Stop
+                            </Button>
+                          ) : (
+                            <Button 
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-8 text-[9px] uppercase font-bold border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                              onClick={() => onSelectDestinationStop && onSelectDestinationStop(stop)}
+                            >
+                              Set As Destination
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })
+            : []
+          )
+          : (activeRoute && activeRoute.stops ? activeRoute.stops.map((stop) => {
+              const isBoarding = targetStop?.id === stop.id;
+              const isDestination = destinationStop?.id === stop.id;
+              
+              let iconHtml = `<div style="background-color: ${activeRoute.color}; width: 12px; height: 12px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`;
+              let iconSz: [number, number] = [12, 12];
+              let iconAnch: [number, number] = [6, 6];
+              
+              if (isBoarding) {
+                iconHtml = `
+                  <div class="relative flex items-center justify-center w-6 h-6">
+                    <div class="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-45"></div>
+                    <div class="absolute inset-1 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-lg">
+                      <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                    </div>
+                  </div>
+                `;
+                iconSz = [24, 24];
+                iconAnch = [12, 12];
+              } else if (isDestination) {
+                iconHtml = `
+                  <div class="relative flex items-center justify-center w-6 h-6">
+                    <div class="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-45"></div>
+                    <div class="absolute inset-1 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center shadow-lg">
+                      <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                    </div>
+                  </div>
+                `;
+                iconSz = [24, 24];
+                iconAnch = [12, 12];
+              }
+
+              return (
+                <Marker 
+                  key={stop.id} 
+                  position={[stop.lat, stop.lng]} 
+                  icon={L.divIcon({
+                    className: "stop-dot",
+                    html: iconHtml,
+                    iconSize: iconSz,
+                    iconAnchor: iconAnch,
+                  })}
                 >
-                  SET AS MY STOP
-                </Button>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+                  <Popup>
+                    <div className="p-3 text-center min-w-[180px]">
+                      <div className="font-bold text-sm mb-1">{stop.name}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">Transit Stop</div>
+                      
+                      <div className="bg-primary/5 rounded-lg p-2 mb-3 border border-primary/10">
+                        <div className="text-[9px] text-primary font-bold uppercase mb-0.5">Next Arrival</div>
+                        <div className="text-lg font-display font-bold text-primary">{getNextArrival(stop)}</div>
+                      </div>
+                      
+                      <div className="flex flex-col gap-1.5">
+                        {isBoarding ? (
+                          <Button 
+                            size="sm"
+                            variant="destructive"
+                            className="w-full h-8 text-[9px] uppercase font-bold"
+                            onClick={() => onSelectStop && onSelectStop(null)}
+                          >
+                            Remove Boarding Stop
+                          </Button>
+                        ) : (
+                          <Button 
+                            size="sm"
+                            className="w-full h-8 text-[9px] uppercase font-bold"
+                            onClick={() => onSelectStop && onSelectStop(stop)}
+                          >
+                            Set As Boarding Stop
+                          </Button>
+                        )}
+                        
+                        {isDestination ? (
+                          <Button 
+                            size="sm"
+                            variant="destructive"
+                            className="w-full h-8 text-[9px] uppercase font-bold"
+                            onClick={() => onSelectDestinationStop && onSelectDestinationStop(null)}
+                          >
+                            Remove Destination Stop
+                          </Button>
+                        ) : (
+                          <Button 
+                            size="sm"
+                            variant="outline"
+                            className="w-full h-8 text-[9px] uppercase font-bold border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                            onClick={() => onSelectDestinationStop && onSelectDestinationStop(stop)}
+                          >
+                            Set As Destination
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })
+          : [])}
 
         {/* Live Buses */}
         {filteredBuses.map((bus) => {

@@ -4,6 +4,7 @@ import { Leaf, Clock, MapPin, Bus } from "lucide-react";
 import { rtdb } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
 import { SARGODHA_ROUTES } from "@/lib/routes";
+import { useDemo } from "@/lib/DemoContext";
 
 const AnimatedCounter = ({ end, duration = 2 }: { end: number; duration?: number }) => {
   const [count, setCount] = useState<number>(0);
@@ -77,23 +78,39 @@ export const BentoStats = () => {
   const isInView = useInView(containerRef, { once: true, margin: "-100px" });
   
   const [activeBusesCount, setActiveBusesCount] = useState(0);
+  const { isDemoMode, buses: demoBuses } = useDemo();
   const totalRoutesCount = SARGODHA_ROUTES.length;
   const totalStopsCount = SARGODHA_ROUTES.reduce((acc, route) => acc + route.stops.length, 0);
 
   useEffect(() => {
+    const getActiveCount = (busList: any[]) => {
+      const now = Date.now();
+      return busList.filter((bus: any) => {
+        if (bus.status === "inactive") return false;
+        if ((now - (bus.lastUpdated || 0)) > 60000) return false;
+        if (!isDemoMode && !bus.driverEmail) return false;
+        return true;
+      }).length;
+    };
+
+    if (isDemoMode) {
+      setActiveBusesCount(getActiveCount(demoBuses));
+      return;
+    }
+
     const busesRef = ref(rtdb, "buses");
     const unsubscribe = onValue(busesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const count = Object.values(data).filter((bus: any) => bus.status === "active").length;
-        setActiveBusesCount(count);
+        const busList = Object.values(data);
+        setActiveBusesCount(getActiveCount(busList));
       } else {
         setActiveBusesCount(0);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isDemoMode, demoBuses]);
 
   const containerVariants = {
     hidden: { opacity: 0 },

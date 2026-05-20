@@ -3,21 +3,43 @@ import { Bus, Wifi, Battery, Shield, Zap, ThermometerSnowflake, Users, Clock, Cr
 import { useEffect, useState } from "react";
 import { rtdb } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
+import { useDemo } from "@/lib/DemoContext";
+
+const isActuallyActive = (bus: any) => {
+  if (bus.status === "inactive") return false;
+  if ((Date.now() - (bus.lastUpdated || 0)) > 60000) return false;
+  if (!bus.lat || !bus.lng) return false;
+  if (bus.lat < 23 || bus.lat > 37) return false;
+  if (bus.lng < 60 || bus.lng > 77) return false;
+  return true;
+};
 
 export const FleetShowcase = () => {
   const [activeBuses, setActiveBuses] = useState(0);
+  const { isDemoMode, buses: demoBuses } = useDemo();
 
   useEffect(() => {
+    const getActiveCount = (busList: any[]) => {
+      return busList.filter(bus => isActuallyActive(bus)).length;
+    };
+
+    if (isDemoMode) {
+      setActiveBuses(getActiveCount(demoBuses));
+      return;
+    }
+
     const busesRef = ref(rtdb, "buses");
     const unsubscribe = onValue(busesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const count = Object.values(data).filter((bus: any) => bus.status === "active").length;
-        setActiveBuses(count);
+        const busList = Object.values(data);
+        setActiveBuses(getActiveCount(busList));
+      } else {
+        setActiveBuses(0);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [isDemoMode, demoBuses]);
 
   const features = [
     { icon: <Zap className="w-5 h-5" />, label: "100% Electric", detail: "Yutong 12-Metre Model" },

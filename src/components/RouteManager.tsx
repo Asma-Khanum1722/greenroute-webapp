@@ -8,18 +8,18 @@ import { toast } from "sonner";
 import { SARGODHA_ROUTES } from "@/lib/routes";
 
 const COMMON_DESTINATIONS = [
-  { name: "University of Sargodha", lat: 32.0738, lng: 72.6835 },
-  { name: "Shaheen Chowk", lat: 32.0912, lng: 72.6845 },
-  { name: "Satellite Town", lat: 32.1023, lng: 72.6934 },
-  { name: "DHQ Hospital", lat: 32.0745, lng: 72.6623 },
-  { name: "47 Pull", lat: 32.0543, lng: 72.6845 },
-  { name: "Kirana Hills", lat: 31.9745, lng: 72.7123 },
+  { name: "University of Sargodha", lat: 32.0728424, lng: 72.684187 },
+  { name: "Shaheen Chowk", lat: 32.0839, lng: 72.6647 },
+  { name: "Satellite Town", lat: 32.0849, lng: 72.6889 },
+  { name: "DHQ Hospital", lat: 32.0817926, lng: 72.6629141 },
+  { name: "47 Pull", lat: 32.0495, lng: 72.6534 },
+  { name: "Kirana Hills", lat: 32.0123, lng: 72.6234 },
   { name: "PAF Colony", lat: 32.0512, lng: 72.6543 },
   { name: "Zafarullah Chowk", lat: 32.0812, lng: 72.6645 },
   { name: "Remount Depot", lat: 32.1123, lng: 72.6543 },
   { name: "Sillanwali Road", lat: 32.0645, lng: 72.6423 },
-  { name: "Khayam Chowk", lat: 32.0712, lng: 72.6712 },
-  { name: "Trust Plaza", lat: 32.0845, lng: 72.6711 },
+  { name: "Khayam Chowk", lat: 32.0794, lng: 72.6709 },
+  { name: "Trust Plaza", lat: 32.0754, lng: 72.6743 },
 ];
 
 export const RouteManager = () => {
@@ -63,7 +63,7 @@ export const RouteManager = () => {
         distanceKm: 15,
         headway: 20,
         stops: [
-          { id: `${newRoute.id}-origin`, name: newRoute.from, lat: 32.0835, lng: 72.6744 },
+          { id: `${newRoute.id}-origin`, name: newRoute.from, lat: 32.0755605, lng: 72.6976644 },
           { id: `${newRoute.id}-dest`, name: destination.name, lat: destination.lat, lng: destination.lng }
         ]
       });

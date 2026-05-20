@@ -6,9 +6,22 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
 import { useRoutes } from "@/lib/routes";
+import { useDemo } from "@/lib/DemoContext";
+
+const isActuallyActive = (bus: any, isDemoMode = false) => {
+  if (bus.status === "inactive") return false;
+  const lastTime = bus.lastUpdated || bus.lastUpdate || 0;
+  if ((Date.now() - lastTime) > 60000) return false;
+  if (!bus.lat || !bus.lng) return false;
+  if (bus.lat < 23 || bus.lat > 37) return false;
+  if (bus.lng < 60 || bus.lng > 77) return false;
+  if (!isDemoMode && !bus.driverEmail) return false;
+  return true;
+};
 
 export const FleetManager = () => {
   const routes = useRoutes();
+  const { isDemoMode } = useDemo();
   const [buses, setBuses] = useState<any[]>([]);
   const [newBusId, setNewBusId] = useState("");
   const [selectedRoute, setSelectedRoute] = useState("r1");
@@ -21,6 +34,7 @@ export const FleetManager = () => {
         const busList = Object.entries(data).map(([id, val]: [string, any]) => ({
           dbId: id,
           ...val,
+          id: val.id || id.toUpperCase(),
         }));
         setBuses(busList);
       } else {
@@ -33,19 +47,20 @@ export const FleetManager = () => {
   const handleAddBus = async () => {
     if (!newBusId) return toast.error("Enter a Bus ID (e.g., E40)");
     
+    const cleanBusId = newBusId.trim().toLowerCase();
+    
     try {
-      const busesRef = ref(rtdb, "buses");
-      const newBusRef = push(busesRef);
-      await set(newBusRef, {
-        id: newBusId,
+      const busRef = ref(rtdb, `buses/${cleanBusId}`);
+      await set(busRef, {
+        id: cleanBusId.toUpperCase(),
         routeId: selectedRoute,
-        status: "offline",
-        lastUpdate: Date.now(),
-        lat: 32.0836, // Default Sargodha Center
-        lng: 72.6711,
+        status: "inactive",
+        lastUpdated: Date.now(),
+        lat: 32.0755605, // Default GBS Sargodha Center
+        lng: 72.6976644,
       });
       setNewBusId("");
-      toast.success(`Bus ${newBusId} added to the fleet inventory.`);
+      toast.success(`Bus ${cleanBusId.toUpperCase()} added to the fleet inventory.`);
     } catch (error) {
       toast.error("Failed to add bus");
     }
@@ -111,15 +126,15 @@ export const FleetManager = () => {
           >
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${
-                bus.status === 'active' ? 'bg-primary/20 border-primary/30' : 'bg-white/5 border-white/10'
+                isActuallyActive(bus, isDemoMode) ? 'bg-primary/20 border-primary/30' : 'bg-white/5 border-white/10'
               }`}>
-                <Bus className={`w-5 h-5 ${bus.status === 'active' ? 'text-primary' : 'text-white/20'}`} />
+                <Bus className={`w-5 h-5 ${isActuallyActive(bus, isDemoMode) ? 'text-primary' : 'text-white/20'}`} />
               </div>
               <div>
                 <p className="text-sm font-bold text-white">{bus.id}</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${bus.status === 'active' ? 'bg-primary animate-pulse' : 'bg-white/20'}`} />
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{bus.status}</p>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isActuallyActive(bus, isDemoMode) ? 'bg-primary animate-pulse' : 'bg-white/20'}`} />
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{isActuallyActive(bus, isDemoMode) ? 'ACTIVE' : 'INACTIVE'}</p>
                 </div>
               </div>
             </div>

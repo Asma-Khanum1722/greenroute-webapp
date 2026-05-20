@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bus, ShieldCheck, User } from "lucide-react";
+import { Bus, ShieldCheck, User, Eye, EyeOff } from "lucide-react";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
@@ -26,6 +26,7 @@ export default function Auth() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
 
   // Unified routing logic for production
   const handleRouting = async (user: any) => {
@@ -88,6 +89,17 @@ export default function Auth() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Friendly client-side email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Invalid email format", {
+        description: "Please check your email address. It should contain '@' and a dot extension (e.g. name@domain.com)"
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       if (isSignUp) {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -162,14 +174,27 @@ export default function Auth() {
                   className="bg-white/5 border-white/10 h-12 text-white placeholder:text-white/30"
                   required
                 />
+              <div className="relative">
                 <Input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/5 border-white/10 h-12 text-white placeholder:text-white/30"
+                  className="bg-white/5 border-white/10 h-12 text-white placeholder:text-white/30 pr-12"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
                 <Button
                   type="submit"
                   className="w-full h-12 text-sm mt-2 font-bold tracking-widest"

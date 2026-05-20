@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
-import { db, firebaseConfig } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc } from "firebase/firestore";
+import { db, firebaseConfig, rtdb } from "@/lib/firebase";
+import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc, getDocs } from "firebase/firestore";
+import { ref, onValue } from "firebase/database";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { UserCheck, UserPlus, Trash2, ShieldAlert } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
+import { useDemo } from "@/lib/DemoContext";
 
 export const DriverManager = () => {
+  const { isDemoMode } = useDemo();
   const [drivers, setDrivers] = useState<any[]>([]);
+  const [activeBuses, setActiveBuses] = useState<any[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -17,15 +21,50 @@ export const DriverManager = () => {
 
   useEffect(() => {
     const q = query(collection(db, "users"), where("role", "==", "driver"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeFirestore = onSnapshot(q, (snapshot) => {
       const driverList = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
       setDrivers(driverList);
     });
-    return () => unsubscribe();
+
+    const busesRef = ref(rtdb, "buses");
+    const unsubscribeRTDB = onValue(busesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const busList = Object.values(data);
+        setActiveBuses(busList);
+      } else {
+        setActiveBuses([]);
+      }
+    });
+
+    return () => {
+      unsubscribeFirestore();
+      unsubscribeRTDB();
+    };
   }, []);
+
+  const isActuallyActive = (bus: any) => {
+    if (bus.status === "inactive") return false;
+    const lastTime = bus.lastUpdated || bus.lastUpdate || 0;
+    if ((Date.now() - lastTime) > 60000) return false;
+    if (!bus.lat || !bus.lng) return false;
+    if (bus.lat < 23 || bus.lat > 37) return false;
+    if (bus.lng < 60 || bus.lng > 77) return false;
+    if (!isDemoMode && !bus.driverEmail) return false;
+    return true;
+  };
+
+  const isDriverActive = (driverEmail: string, driverName: string) => {
+    return activeBuses.some(
+      (bus: any) => 
+        ((bus.driverEmail && bus.driverEmail.toLowerCase() === driverEmail.toLowerCase()) ||
+         (bus.driverName && bus.driverName.toLowerCase() === driverName.toLowerCase())) && 
+        isActuallyActive(bus)
+    );
+  };
 
   const handleCreateDriver = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,16 +115,35 @@ export const DriverManager = () => {
     }
   };
 
-  const handleDeleteDriver = async (id: string, driverName: string) => {
+  const handleDeleteDriver = async (id: string, driverName: string, email: string) => {
     if (confirm(`Are you sure you want to remove access for driver: ${driverName}? This will delete their profile.`)) {
       try {
-        await deleteDoc(doc(db, "users", id));
+        // Query Firestore to find all user documents with this email and delete them
+        const q = query(collection(db, "users"), where("email", "==", email));
+        const snapshot = await getDocs(q);
+        const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
         toast.success("Driver removed successfully");
       } catch (error) {
         toast.error("Failed to remove driver");
       }
     }
   };
+
+  // Deduplicate drivers by email to ensure database duplicates don't clutter the UI
+  const uniqueDrivers = drivers.filter(
+    (driver, index, self) =>
+      index === self.findIndex((d) => d.email?.toLowerCase() === driver.email?.toLowerCase())
+  );
+
+  // Sort drivers: Put active drivers on top, and sort alphabetically otherwise
+  const sortedDrivers = [...uniqueDrivers].sort((a, b) => {
+    const aActive = isDriverActive(a.email, a.name);
+    const bActive = isDriverActive(b.email, b.name);
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return (a.name || "").localeCompare(b.name || "");
+  });
 
   return (
     <div className="glass-card p-4 md:p-6 border-white/5 mt-8">
@@ -151,12 +209,12 @@ export const DriverManager = () => {
 
         {/* Drivers List */}
         <div className="lg:col-span-2 space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-          {drivers.length === 0 && (
+          {sortedDrivers.length === 0 && (
             <div className="text-center py-10 text-muted-foreground text-sm border-2 border-dashed border-white/5 rounded-xl">
               No drivers registered in the system.
             </div>
           )}
-          {drivers.map((driver) => (
+          {sortedDrivers.map((driver) => (
             <div 
               key={driver.id} 
               className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all group"
@@ -177,14 +235,14 @@ export const DriverManager = () => {
                 <div className="text-right hidden sm:block mr-2">
                   <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-0.5">Status</p>
                   <div className="flex items-center justify-end gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${driver.isActive ? 'bg-primary animate-pulse' : 'bg-destructive'}`} />
-                    <span className="text-[10px] font-bold text-white">{driver.isActive ? 'ACTIVE' : 'INACTIVE'}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isDriverActive(driver.email, driver.name) ? 'bg-primary animate-pulse' : 'bg-destructive'}`} />
+                    <span className="text-[10px] font-bold text-white">{isDriverActive(driver.email, driver.name) ? 'ACTIVE' : 'INACTIVE'}</span>
                   </div>
                 </div>
                 <Button 
                   variant="ghost" 
                   size="icon"
-                  onClick={() => handleDeleteDriver(driver.id, driver.name)}
+                  onClick={() => handleDeleteDriver(driver.id, driver.name, driver.email)}
                   className="text-white/20 hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="w-4 h-4" />

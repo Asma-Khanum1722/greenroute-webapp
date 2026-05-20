@@ -3,14 +3,14 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { MapPin, Power, Map as MapIcon, Navigation, LogOut, Bus as BusIcon, Activity } from "lucide-react";
+import { MapPin, Power, Navigation, Bus as BusIcon, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { rtdb, auth, db } from "@/lib/firebase";
-import { ref, set, update, onDisconnect } from "firebase/database";
+import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { SARGODHA_ROUTES } from "@/lib/routes";
+import { trackingService } from "@/lib/trackingService";
 import { 
   Select, 
   SelectContent, 
@@ -21,17 +21,13 @@ import {
 
 export default function DriverDashboard() {
   // VIVA-NOTE: We use 'useState' to manage the dynamic parts of the UI.
-  // The <number | null>, <string>, etc. are TypeScript types that tell the editor 
-  // exactly what kind of data to expect, preventing bugs during the demo.
+  // We synchronize these local UI states with our global background trackingService.
   const [isTracking, setIsTracking] = useState(false);
-  const [watchId, setWatchId] = useState<number | null>(null);
   const [driverName, setDriverName] = useState<string>("");
   const [assignedBusId, setAssignedBusId] = useState<string | null>(null);
   const [assignedRouteId, setAssignedRouteId] = useState<string>("r1"); // Default to R1 Bhera Express
   const [locationPermission, setLocationPermission] = useState<PermissionState | "unsupported">("prompt");
   const navigate = useNavigate();
-
-  const GBS_TERMINAL = { lat: 32.0722, lng: 72.6861 };
 
   // VIVA-NOTE: Browsers block GPS on non-HTTPS sites. We must warn the user.
   useEffect(() => {
@@ -63,19 +59,35 @@ export default function DriverDashboard() {
     fetchProfile();
   }, []);
 
-  const handleLogout = async () => {
-    if (isTracking) stopTracking();
-    
-    // Explicit cleanup on logout
-    if (assignedBusId) {
-      const busRef = ref(rtdb, `buses/${assignedBusId}`);
-      await update(busRef, { 
-        status: "inactive",
-        lat: GBS_TERMINAL.lat,
-        lng: GBS_TERMINAL.lng
-      });
-    }
+  // SUBSCRIBE TO PERSISTENT TRACKING SERVICE: 
+  // Keeps the dashboard UI updated with the current background tracking state.
+  useEffect(() => {
+    const unsubscribe = trackingService.subscribe((session) => {
+      setIsTracking(session.isTracking);
+      if (session.isTracking) {
+        setAssignedBusId(session.assignedBusId);
+        setAssignedRouteId(session.assignedRouteId);
 
+        // Auto-resume tracking loops if session exists in memory (from localStorage)
+        // but background tasks have not started yet (e.g. after refresh/code-reload).
+        if (session.watchId === null && session.heartbeatInterval === null) {
+          trackingService.resume((error) => {
+            if (error.code === error.PERMISSION_DENIED) {
+              toast.error("GPS Permission Denied. Stopping shift.");
+              trackingService.stop();
+            } else {
+              toast.warning("GPS signal weak. Reconnecting...");
+            }
+          });
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    // Stop persistent tracking first
+    trackingService.stop();
     await auth.signOut();
     navigate("/login");
   };
@@ -91,77 +103,29 @@ export default function DriverDashboard() {
       return;
     }
 
-    // Attempt to get position to trigger the browser popup
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        setIsTracking(true);
-        toast.success(`Shift Started: Bus ${assignedBusId.toUpperCase()}`);
-
-        const id = navigator.geolocation.watchPosition(
-          (position) => {
-            const { latitude, longitude, speed, heading } = position.coords;
-            const busRef = ref(rtdb, `buses/${assignedBusId}`);
-            const route = SARGODHA_ROUTES.find(r => r.id === assignedRouteId);
-            
-            // Set up onDisconnect cleanup inside the first successful position
-            onDisconnect(busRef).update({
-              status: "inactive",
-              lat: GBS_TERMINAL.lat,
-              lng: GBS_TERMINAL.lng,
-              lastUpdated: Date.now()
-            });
-
-            set(busRef, {
-              id: assignedBusId.toUpperCase(),
-              routeId: assignedRouteId,
-              routeName: route?.name || "",
-              lat: latitude,
-              lng: longitude,
-              speed: speed ? Math.round(speed * 3.6) : 0,
-              heading: heading || 0,
-              lastUpdated: Date.now(),
-              status: "active",
-              driverName: driverName
-            });
-          },
-          (error) => {
-            console.error("GPS Error:", error);
-            toast.error("GPS Signal Lost.");
-            stopTracking();
-          },
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-        );
-        setWatchId(id);
-      },
+    trackingService.start(
+      assignedBusId,
+      assignedRouteId,
+      driverName,
+      auth.currentUser?.email || "",
       (error) => {
-        toast.error("Location access denied. Please enable GPS in settings.");
-        console.error(error);
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error("GPS Permission Denied. Stopping shift.");
+          trackingService.stop();
+        } else {
+          toast.warning("GPS signal weak. Reconnecting...");
+        }
       }
     );
+    
+    toast.success(`Shift Started: Bus ${assignedBusId.toUpperCase()}`);
   };
 
   const stopTracking = () => {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
-    }
-    
-    // Reset to Terminal and set to inactive
-    if (assignedBusId) {
-      const busRef = ref(rtdb, `buses/${assignedBusId}`);
-      update(busRef, { 
-        status: "inactive",
-        lat: GBS_TERMINAL.lat,
-        lng: GBS_TERMINAL.lng,
-        lastUpdated: Date.now()
-      });
-      // Cancel onDisconnect since we manually cleaned up
-      onDisconnect(busRef).cancel();
-    }
-
-    setIsTracking(false);
+    trackingService.stop();
     toast.info("Shift Ended. Bus set to Inactive.");
   };
+
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -272,7 +236,7 @@ export default function DriverDashboard() {
                     className="mt-8 flex items-center gap-4 text-primary bg-primary/5 p-4 rounded-xl border border-primary/10"
                   >
                     <MapPin className="w-5 h-5 animate-bounce" />
-                    <p className="text-sm font-medium">Your live location is currently being broadcast to the Admin God-View.</p>
+                    <p className="text-sm font-medium">Your live location is currently being broadcast.</p>
                   </motion.div>
                 )}
               </AnimatePresence>

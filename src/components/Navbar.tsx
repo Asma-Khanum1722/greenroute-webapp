@@ -6,6 +6,10 @@ import { Button } from "./ui/button";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
+import { rtdb } from "@/lib/firebase";
+import { ref, get, update } from "firebase/database";
+import { trackingService } from "@/lib/trackingService";
+
 const navLinks = [
   { label: "Map", href: "/#live-map" },
   { label: "About Us", href: "/#about" },
@@ -17,6 +21,7 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -28,16 +33,48 @@ export const Navbar = () => {
       if (user) {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
-          setRole(userDoc.data()?.role || "passenger");
+          const userData = userDoc.data();
+          setRole(userData?.role || "passenger");
+          setProfileName(userData?.name || null);
         }
       } else {
+        // Enforce background tracking termination if authenticated state is lost
+        trackingService.stop();
         setRole(null);
+        setProfileName(null);
       }
     });
     return () => unsub();
   }, []);
 
   const handleLogout = async () => {
+    // Stop persistent tracking first
+    trackingService.stop();
+
+    try {
+      if (role === "driver" && profileName) {
+        // Query the database to find any bus driven by this driver and set it to inactive
+        const busesRef = ref(rtdb, "buses");
+        const snapshot = await get(busesRef);
+        if (snapshot.exists()) {
+          const busesData = snapshot.val();
+          for (const [key, value] of Object.entries(busesData) as any) {
+            if (
+              (value.driverEmail && value.driverEmail.toLowerCase() === currentUser?.email?.toLowerCase()) ||
+              (value.driverName && value.driverName.toLowerCase() === profileName.toLowerCase())
+            ) {
+              const busRef = ref(rtdb, `buses/${key}`);
+              await update(busRef, {
+                status: "inactive",
+                lastUpdated: Date.now()
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Cleanup on logout failed:", err);
+    }
     await auth.signOut();
     navigate("/");
   };
