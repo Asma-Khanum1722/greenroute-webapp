@@ -418,8 +418,8 @@ export default function PassengerDashboard() {
       <Navbar />
       <div className="h-full pt-24 min-h-0 overflow-hidden">
         <div className="flex h-full min-h-0 overflow-hidden">
-          <aside className="w-[420px] min-w-[320px] h-full overflow-y-auto bg-black/25 backdrop-blur-xl border-r border-white/5 p-6 space-y-6">
-            <div className="rounded-3xl border border-white/5 bg-white/[0.02] p-5 space-y-5">
+          <aside className="w-[460px] min-w-[360px] h-full overflow-y-auto bg-black/25 backdrop-blur-xl border-r border-white/5 p-8 space-y-8">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.02] p-6 space-y-6">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
                   <Navigation className="w-5 h-5 text-primary" />
@@ -452,12 +452,12 @@ export default function PassengerDashboard() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-3xl bg-white/[0.03] border border-white/10 p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-3xl bg-white/[0.03] border border-white/10 p-5">
                     <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">Active buses</p>
                     <p className="text-2xl font-display font-extrabold text-white">{activeBuses}</p>
                   </div>
-                  <div className="rounded-3xl bg-white/[0.03] border border-white/10 p-4">
+                  <div className="rounded-3xl bg-white/[0.03] border border-white/10 p-5">
                     <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">Selected route</p>
                     <p className="text-sm font-bold text-white truncate">{selectedRouteObj?.name || 'All routes'}</p>
                   </div>
@@ -482,7 +482,7 @@ export default function PassengerDashboard() {
                   Configure Your Trip
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 {selectedRouteObj ? (
                   <div className="space-y-4">
                     <div>
@@ -587,7 +587,7 @@ export default function PassengerDashboard() {
                   Live Nearby Buses
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 {!hasSelectedStop ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-white/10 rounded-xl bg-white/[0.01] gap-3">
                     <BusIcon className="w-8 h-8 text-muted-foreground/40" />
@@ -734,7 +734,7 @@ export default function PassengerDashboard() {
                    {!isLoggedIn && <Lock className="w-3.5 h-3.5 text-white/30 ml-auto" />}
                  </CardTitle>
                </CardHeader>
-               <CardContent className="space-y-3">
+               <CardContent className="space-y-6">
                  {!isLoggedIn ? (
                    <div className="flex flex-col items-center gap-3 py-4">
                      <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -809,7 +809,7 @@ export default function PassengerDashboard() {
                    {!isLoggedIn && <Lock className="w-3.5 h-3.5 text-white/30 ml-auto" />}
                  </CardTitle>
                </CardHeader>
-               <CardContent className="space-y-2 px-3 pb-3">
+               <CardContent className="space-y-4 px-3 pb-3">
                  {!isLoggedIn ? (
                    <div className="flex flex-col items-center gap-3 py-4">
                      <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -854,42 +854,44 @@ export default function PassengerDashboard() {
              </Card>
           </aside>
 
-          <section className="flex-1 h-full min-h-0 relative overflow-hidden">
-            <BusMap 
-              className="h-full w-full rounded-none border-none"
-              selectedRoute={selectedRoute}
-              targetStop={targetStop}
-              onSelectStop={(stop) => {
-                setTargetStop(stop);
-                const stopRoute = routes.find(r => r.stops.some((s: any) => s.id === stop.id));
-                if (stopRoute && selectedRoute === "all") setSelectedRoute(stopRoute.id);
-                toast.info(`Boarding Stop set to: ${stop.name}`);
-              }}
-              destinationStop={destinationStop}
-              onSelectDestinationStop={(stop) => {
-                setDestinationStop(stop);
-                toast.info(`Destination Stop set to: ${stop.name}`);
-              }}
-            />
+          <section className="flex-1 h-full min-h-0 relative overflow-hidden p-4">
+            <div className="h-full rounded-[32px] border border-white/10 overflow-hidden shadow-2xl">
+              <BusMap 
+                className="h-full w-full rounded-[32px] border-none"
+                selectedRoute={selectedRoute}
+                targetStop={targetStop}
+                onSelectStop={(stop) => {
+                  setTargetStop(stop);
+                  const stopRoute = routes.find(r => r.stops.some((s: any) => s.id === stop.id));
+                  if (stopRoute && selectedRoute === "all") setSelectedRoute(stopRoute.id);
+                  toast.info(`Boarding Stop set to: ${stop.name}`);
+                }}
+                destinationStop={destinationStop}
+                onSelectDestinationStop={(stop) => {
+                  setDestinationStop(stop);
+                  toast.info(`Destination Stop set to: ${stop.name}`);
+                }}
+              />
+            </div>
 
             <div className="absolute bottom-6 left-6 right-6 pointer-events-none">
               <div className="grid gap-3 xl:grid-cols-2">
-                <div className="pointer-events-auto rounded-3xl border border-white/10 bg-black/45 p-4 backdrop-blur-xl text-white shadow-2xl">
+                <div className="pointer-events-auto rounded-3xl border border-white/10 bg-black/45 p-5 backdrop-blur-xl text-white shadow-2xl">
                   <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">Trip Info</p>
-                  <p className="mt-2 text-sm font-bold text-white">
+                  <p className="mt-3 text-sm font-bold text-white leading-snug">
                     {targetStop ? targetStop.name : 'Boarding stop not selected'}
                   </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+                  <p className="mt-2 text-[11px] text-muted-foreground">
                     {destinationStop ? `Destination: ${destinationStop.name}` : 'Choose a destination in the sidebar or on the map'}
                   </p>
                 </div>
-                <div className="pointer-events-auto rounded-3xl border border-white/10 bg-black/45 p-4 backdrop-blur-xl text-white shadow-2xl">
+                <div className="pointer-events-auto rounded-3xl border border-white/10 bg-black/45 p-5 backdrop-blur-xl text-white shadow-2xl">
                   <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">Walk Time</p>
-                  <p className="mt-2 text-sm font-bold text-white">
+                  <p className="mt-3 text-sm font-bold text-white leading-snug">
                     {walkingTimeMinutes ? `~${walkingTimeMinutes} min walk` : 'Select a boarding stop'}
                   </p>
                   {walkingDistanceKm !== null && (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
+                    <p className="mt-2 text-[11px] text-muted-foreground">
                       {formatDist(walkingDistanceKm)} from your current location
                     </p>
                   )}
