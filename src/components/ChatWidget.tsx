@@ -45,7 +45,7 @@ export const ChatWidget = () => {
     setLastSentTime(now);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyDYPnFe8citay2hWTR3uqzbdEed4ICZpsQ";
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyCaU-WV3MZ0hhq1vVcI8hZML2XTLp46oSA";
       const historyForApi = [...messages, userMessage].slice(-6);
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
@@ -88,17 +88,17 @@ export const ChatWidget = () => {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className={`fixed md:absolute inset-0 md:inset-auto md:bottom-[80px] md:right-0 w-full h-full md:w-[320px] md:h-[500px] bg-[#1a1a2e] md:rounded-2xl border-white/10 shadow-2xl flex flex-col overflow-hidden z-[10000]`}
+            className={`fixed md:absolute inset-0 md:inset-auto md:bottom-[90px] md:right-0 w-full h-full md:w-[380px] md:h-[600px] bg-black/60 backdrop-blur-2xl md:rounded-3xl border border-white/10 shadow-2xl shadow-primary/20 flex flex-col overflow-hidden z-[10000]`}
           >
             {/* Header */}
-            <div className="p-4 md:p-4 border-b border-white/5 flex items-center justify-between bg-primary shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 md:w-8 md:h-8 rounded-full bg-white/20 flex items-center justify-center">
-                  <Bot className="w-6 h-6 md:w-5 md:h-5 text-white" />
+            <div className="p-4 md:p-5 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-primary to-primary/80 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 md:w-10 md:h-10 rounded-full bg-black/20 flex items-center justify-center shadow-inner">
+                  <Bot className="w-6 h-6 md:w-5 md:h-5 text-black" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-display font-bold text-base md:text-sm text-white leading-none">GreenRoute Assistant</span>
-                  <span className="text-[11px] md:text-[10px] text-white/80 mt-1">Sargodha Bus Service Help</span>
+                  <span className="font-display font-bold text-lg md:text-base text-black leading-none">GreenRoute Assistant</span>
+                  <span className="text-[12px] md:text-[11px] text-black/70 mt-1 font-medium">Sargodha Bus Service Help</span>
                 </div>
               </div>
               <button onClick={() => setIsOpen(false)} className="p-2 -mr-2 text-white/40 hover:text-white transition-colors">
@@ -107,13 +107,13 @@ export const ChatWidget = () => {
             </div>
 
             {/* Chat Area */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 md:p-4 space-y-6 md:space-y-4 scrollbar-thin scrollbar-thumb-white/10">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 md:p-5 space-y-6 md:space-y-5 scrollbar-thin scrollbar-thumb-white/10">
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[85%] p-4 md:p-3 rounded-2xl text-base md:text-sm ${
+                  <div className={`max-w-[85%] p-4 md:p-4 rounded-3xl text-base md:text-[13px] leading-relaxed ${
                     msg.role === "user" 
-                      ? "bg-primary text-black rounded-tr-none shadow-lg shadow-primary/20" 
-                      : "bg-white/5 text-white/90 border border-white/5 rounded-tl-none"
+                      ? "bg-primary text-black rounded-tr-sm shadow-lg shadow-primary/20 font-medium" 
+                      : "bg-white/10 text-white/95 border border-white/10 rounded-tl-sm backdrop-blur-md shadow-xl"
                   }`}>
                     {msg.content}
                   </div>
@@ -122,7 +122,7 @@ export const ChatWidget = () => {
               
               {/* Suggested Questions Chips */}
               {messages.length === 1 && (
-                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/5">
+                <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-white/10">
                   {[
                     "What are the bus routes?",
                     "What is the fare?",
@@ -131,7 +131,7 @@ export const ChatWidget = () => {
                     <button
                       key={q}
                       onClick={() => handleSend(q)}
-                      className="px-5 py-3 md:px-4 md:py-2 rounded-full bg-white/5 border border-white/10 text-sm md:text-[10px] font-bold uppercase tracking-wider text-white/60 hover:border-primary/50 hover:text-primary transition-all text-left"
+                      className="px-5 py-3 md:px-4 md:py-2.5 rounded-full bg-white/5 border border-white/10 text-sm md:text-[11px] font-bold uppercase tracking-wider text-white/70 hover:bg-primary/20 hover:border-primary hover:text-primary transition-all text-left shadow-sm"
                     >
                       {q}
                     </button>
@@ -141,29 +141,30 @@ export const ChatWidget = () => {
 
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-white/5 p-3 rounded-2xl rounded-tl-none border border-white/5">
-                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  <div className="bg-white/10 p-4 rounded-3xl rounded-tl-sm border border-white/10 backdrop-blur-md">
+                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
                   </div>
                 </div>
               )}
             </div>
 
             {/* Input Area */}
-            <div className="p-6 md:p-4 border-t border-white/5 bg-white/[0.02] shrink-0 pb-safe">
-              <div className="flex items-center gap-2">
+            <div className="p-6 md:p-5 border-t border-white/10 bg-black/40 shrink-0 pb-safe backdrop-blur-xl">
+              <div className="flex items-center gap-3">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Ask about routes..."
-                  className="flex-1 bg-white/5 border border-primary/30 rounded-xl px-4 py-3 md:py-2.5 text-base md:text-xs text-white focus:outline-none focus:border-primary/60 transition-colors"
+                  placeholder="Ask anything about GreenRoute..."
+                  className="flex-1 bg-white/5 border border-white/20 rounded-2xl px-5 py-4 md:py-3.5 text-base md:text-[13px] text-white focus:outline-none focus:border-primary focus:bg-white/10 transition-all shadow-inner placeholder:text-white/40"
                 />
                 <Button 
                   onClick={() => handleSend()} 
                   disabled={isLoading || !input.trim()} 
-                  className="px-6 h-12 md:h-10 text-[10px]"
+                  className="px-6 h-[54px] md:h-[46px] rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all text-[12px] uppercase tracking-wider"
                 >
+                  <Send className="w-4 h-4 mr-2" />
                   Send
                 </Button>
               </div>
