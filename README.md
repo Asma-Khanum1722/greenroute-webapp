@@ -30,20 +30,16 @@
 *   **The Problem:** Firebase Client Auth normally forces a logout of the current user session (the Admin) whenever a new user (a Driver) is successfully created.
 *   **The Engineering Solution:** Engineered a custom initialization script that builds a temporary, secondary Firebase App instance. This allowed the Admin to safely register new drivers without compromising or terminating their own secure session.
 
-### 5. Context-Guided Gemini AI Transit Assistant
-*   **Model:** Integrated **Gemini 2.5 Flash-Lite** via direct REST payload streaming.
-*   **Context Scope:** Fed the live Sargodha bus timetables, fares, and route coordinates into the AI's prompt space.
-*   **System Prompt Hardening:** Strictly bounded the LLM to only answer transit-related queries and gracefully handle rate limits (`HTTP 429`), blocking off-topic conversations (e.g., general programming, politics) and presenting a reliable virtual transit agent.
 
 ---
 
 ## 🛠️ Technology Stack
 *   **Frontend Core:** React 18, TypeScript, Vite
 *   **UI/UX:** Tailwind CSS, Shadcn UI, Framer Motion
-*   **Mapping:** Leaflet, React-Leaflet, Turf.js
+*   **Mapping:** Leaflet, React-Leaflet, Turf.js, OpenStreet man
 *   **Backend & DB:** Firebase Auth (RBAC), Cloud Firestore, Firebase RTDB
 *   **AI Integration:** Gemini API (Google AI SDK / REST)
-*   **State Management:** TanStack React Query, React Context
+*   **State Management:** Zustand
 
 ---
 
@@ -103,9 +99,9 @@ graph TD
 ---
 
 ## 👥 Capstone Project Contributors
-*   **Asma Khanum** (Lead Developer — Geolocation, Mapping Architecture & UI System)
-*   **Mahnoor** (Database Specialist — Cloud Datastores & Security Schemas)
-*   **Wajeeha Safdar** (AI Integration Specialist — LLM Optimization & Prompt Engineer)
+*   **Asma Khanum** 
+*   **Mahnoor** 
+*   **Wajeeha Safdar** 
 
 ---
 
