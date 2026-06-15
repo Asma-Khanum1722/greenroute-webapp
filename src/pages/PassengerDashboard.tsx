@@ -9,7 +9,7 @@ import { rtdb, auth, db } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { useRoutes, getRouteDistanceAndETA } from "@/lib/routes";
+import { useRoutes, getRouteDistanceAndETA, getOsrmETA, getRouteAverageSpeed } from "@/lib/routes";
 import { useNavigate } from "react-router-dom";
 import { useDemo } from "@/lib/DemoContext";
 
@@ -49,7 +49,7 @@ export default function PassengerDashboard() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<string>("all");
   const [targetStop, setTargetStop] = useState<any>(null); // Boarding Stop
-  const [destinationStop, setDestinationStop] = useState<any>(null); // Destination Stop
+
   const canUseNotificationApi = typeof window !== "undefined" && "Notification" in window;
   const [allBuses, setAllBuses] = useState<any[]>([]);
   const liveBuses = allBuses;
@@ -110,10 +110,7 @@ export default function PassengerDashboard() {
     if (targetStop && !route.stops.some((stop: any) => stop.id === targetStop.id)) {
       setTargetStop(null);
     }
-    if (destinationStop && !route.stops.some((stop: any) => stop.id === destinationStop.id)) {
-      setDestinationStop(null);
-    }
-  }, [selectedRoute, targetStop, destinationStop, routes]);
+  }, [selectedRoute, targetStop, routes]);
 
   const hasSelectedStop = Boolean(targetStop);
   const walkingDistanceKm = hasSelectedStop && userLocation
@@ -229,19 +226,7 @@ export default function PassengerDashboard() {
   }, [targetStop, isLoggedIn]);
 
 
-  const calculateETAForTerminal = (bus: any, terminal: any) => {
-    const route = routes.find(r => r.id === bus.routeId);
-    if (route && route.stops && route.stops.length > 0) {
-      const stop = route.stops.find(s => s.id === terminal.id || (Math.abs(s.lat - terminal.lat) < 0.0001 && Math.abs(s.lng - terminal.lng) < 0.0001));
-      if (stop) {
-        const calcs = getRouteDistanceAndETA(bus, stop, route);
-        return `${calcs.etaMinutes} mins`;
-      }
-    }
-    const rawDist = calculateDistance(bus.lat, bus.lng, terminal.lat, terminal.lng);
-    const mins = Math.max(1, Math.round((rawDist / 40) * 60));
-    return `${mins} mins`;
-  };
+
 
   // 1. Get Passenger's Real GPS Location
   useEffect(() => {
@@ -280,38 +265,44 @@ export default function PassengerDashboard() {
 
   // 3. Live nearby buses updating every 8 seconds (with immediate call)
   useEffect(() => {
-    const calculate = () => {
+    const calculate = async () => {
       const currentLoc = userLocationRef.current;
       if (!currentLoc || !targetStop) {
         setNearbyBuses([]);
         return;
       }
-      const results = liveBuses
-        .filter(bus => isActuallyActive(bus, isDemoMode))
-        .map(bus => {
-          const route = routes.find(r => r.id === bus.routeId);
-          if (!route || !route.stops || route.stops.length === 0) {
-            const dist = calculateDistance(currentLoc[0], currentLoc[1], bus.lat, bus.lng);
-            return {
-              bus: { ...bus, calcTargetStopName: "User Proximity" },
-              dist,
-              eta: "Select a stop"
-            };
-          }
-
-          const calcTargetStop = targetStop;
-          const calcs = getRouteDistanceAndETA(bus, calcTargetStop, route);
+      
+      const activeLiveBuses = liveBuses.filter(bus => isActuallyActive(bus, isDemoMode));
+      
+      const results = await Promise.all(activeLiveBuses.map(async (bus) => {
+        const route = routes.find(r => r.id === bus.routeId);
+        
+        if (!route || !route.stops || route.stops.length === 0) {
+          const calcs = await getOsrmETA(bus.lat, bus.lng, currentLoc[0], currentLoc[1], bus.speed);
           return {
-            bus: {
-              ...bus,
-              calcTargetStopName: calcTargetStop.name
-            },
+            bus: { ...bus, calcTargetStopName: "User Proximity" },
             dist: calcs.distanceKm,
-            eta: calcs.etaMinutes <= 1 && calcs.distanceKm < 0.1 ? "Arriving" : `${calcs.etaMinutes} min`
+            eta: "Select a stop"
           };
-        })
-        .sort((a, b) => a.dist - b.dist);
-      setNearbyBuses(results);
+        }
+
+        const calcTargetStop = targetStop;
+        const avgSpeed = getRouteAverageSpeed(bus.routeId || "");
+        const fallbackSpeed = bus.speed > 10 ? (bus.speed * 0.7 + avgSpeed * 0.3) : avgSpeed;
+        
+        const calcs = await getOsrmETA(bus.lat, bus.lng, calcTargetStop.lat, calcTargetStop.lng, fallbackSpeed);
+        
+        return {
+          bus: {
+            ...bus,
+            calcTargetStopName: calcTargetStop.name
+          },
+          dist: calcs.distanceKm,
+          eta: calcs.etaMinutes <= 1 && calcs.distanceKm < 0.1 ? "Arriving" : `${calcs.etaMinutes} min`
+        };
+      }));
+      
+      setNearbyBuses(results.sort((a, b) => a.dist - b.dist));
     };
 
     calculate(); // immediate
@@ -468,117 +459,34 @@ export default function PassengerDashboard() {
                     Select your boarding stop for live ETA, distance and alerts. The bus is tracked to the stop, not to your home.
                   </div>
                 ) : (
-                  <div className="rounded-3xl border border-emerald-200/10 bg-emerald-500/5 p-4 text-[11px] font-semibold text-emerald-200">
-                    Boarding stop selected: <span className="text-white">{boardingStopName}</span>. ETA and distance are now calculated to this stop.
+                  <div className="rounded-3xl border border-emerald-200/10 bg-emerald-500/5 p-4 text-[11px] font-semibold flex flex-col gap-3">
+                    <div className="text-emerald-200">
+                      Boarding stop selected: <span className="text-white">{boardingStopName}</span>. ETA and distance are now calculated to this stop.
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {isLoggedIn && (
+                        <button
+                          onClick={toggleAlerts}
+                          className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all ${
+                            isNotificationsEnabled
+                              ? 'border-emerald-500/30 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30'
+                              : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                          }`}
+                        >
+                          {isNotificationsEnabled ? '🔔 Alerts Active' : '🔕 Alerts Paused'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setTargetStop(null)}
+                        className="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-all"
+                      >
+                        Change Stop
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
-
-            <Card className="border-white/10 bg-white/5 overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base font-display uppercase tracking-wider">
-                  <MapPin className="w-4 h-4 text-primary" />
-                  Configure Your Trip
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {selectedRouteObj ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                        Boarding Point
-                      </label>
-                      <div className="max-h-40 overflow-y-auto grid gap-1.5 pr-1">
-                        {selectedRouteObj.stops.map((stop: any) => (
-                          <button
-                            key={`board-${stop.id}`}
-                            onClick={() => setTargetStop(stop)}
-                            className={`text-left px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-                              targetStop?.id === stop.id
-                                ? 'border-primary/40 bg-primary/15 text-primary'
-                                : 'border-white/5 bg-white/[0.02] hover:border-primary/20 hover:bg-primary/5'
-                            }`}
-                          >
-                            {stop.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="border-t border-white/5 pt-3">
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                        Destination Point (Optional)
-                      </label>
-                      <div className="max-h-40 overflow-y-auto grid gap-1.5 pr-1">
-                        {selectedRouteObj.stops.map((stop: any) => {
-                          const isBoarding = targetStop?.id === stop.id;
-                          return (
-                            <button
-                              key={`dest-${stop.id}`}
-                              disabled={isBoarding}
-                              onClick={() => setDestinationStop(stop)}
-                              className={`text-left px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-                                isBoarding ? 'opacity-40 cursor-not-allowed border-none' :
-                                destinationStop?.id === stop.id
-                                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
-                                  : 'border-white/5 bg-white/[0.02] hover:border-emerald-500/20 hover:bg-emerald-500/5'
-                              }`}
-                            >
-                              {stop.name} {isBoarding && "(Boarding Stop)"}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {destinationStop && (
-                        <button
-                          onClick={() => setDestinationStop(null)}
-                          className="mt-2 text-[9px] font-bold text-rose-400 hover:underline block ml-auto"
-                        >
-                          Clear Destination
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-[10px] text-muted-foreground">
-                      {userLocation ? "Nearest stops across all routes:" : "Enable GPS to see nearest stops, or select a route first."}
-                    </p>
-                    {userLocation && (
-                      <div className="max-h-72 overflow-y-auto grid gap-2">
-                        {getAllNearestStops().map((stop: any) => (
-                          <button
-                            key={stop.id}
-                            onClick={() => {
-                              setTargetStop(stop);
-                              setSelectedRoute(stop.routeId);
-                            }}
-                            className={`text-left px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-                              targetStop?.id === stop.id
-                                ? 'border-primary/40 bg-primary/15 text-primary'
-                                : 'border-white/10 bg-white/5 hover:border-primary/20 hover:bg-primary/10'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex flex-col">
-                                <span>{stop.name}</span>
-                                <span className="text-[8px] mt-0.5 font-bold" style={{ color: stop.routeColor }}>
-                                  {stop.routeName}
-                                </span>
-                              </div>
-                              <span className="text-[9px] text-muted-foreground shrink-0">
-                                {stop.distance < 1 ? `${Math.round(stop.distance * 1000)}m` : `${stop.distance.toFixed(1)}km`}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             <Card className="border-primary/20 bg-primary/5 overflow-hidden">
               <CardHeader className="pb-2">
@@ -596,13 +504,13 @@ export default function PassengerDashboard() {
                     </p>
                     {selectedRouteObj ? (
                       <div className="w-full text-left px-4">
-                        <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">Closest stops on {selectedRouteObj.name}</div>
-                        <div className="grid gap-2">
-                          {nearestRouteStops.map((stop: any) => (
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">Select a stop on {selectedRouteObj.name}</div>
+                        <div className="grid gap-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                          {selectedRouteObj.stops.map((stop: any) => (
                             <button
                               key={stop.id}
                               onClick={() => setTargetStop(stop)}
-                              className="text-left px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-[11px] font-semibold hover:border-primary/20 hover:bg-primary/10"
+                              className="text-left px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-[11px] font-semibold hover:border-primary/20 hover:bg-primary/10 transition-all"
                             >
                               {stop.name}
                             </button>
@@ -726,132 +634,6 @@ export default function PassengerDashboard() {
               </CardContent>
             </Card>
 
-             <Card className="border-white/10 bg-white/[0.03] overflow-hidden">
-               <CardHeader className="pb-2">
-                 <CardTitle className="flex items-center gap-2 text-base font-display uppercase tracking-widest">
-                   <Bell className="w-4 h-4 text-primary animate-pulse" />
-                   Notification Alerts
-                   {!isLoggedIn && <Lock className="w-3.5 h-3.5 text-white/30 ml-auto" />}
-                 </CardTitle>
-               </CardHeader>
-               <CardContent className="space-y-6">
-                 {!isLoggedIn ? (
-                   <div className="flex flex-col items-center gap-3 py-4">
-                     <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                       <Lock className="w-4 h-4 text-white/30" />
-                     </div>
-                     <p className="text-[11px] text-white/40 text-center">Sign in to get bus arrival alerts</p>
-                     <button
-                       onClick={() => navigate("/login?portal=passenger")}
-                       className="text-[11px] font-bold text-primary hover:underline transition-all"
-                     >
-                       Sign In →
-                     </button>
-                   </div>
-                 ) : !targetStop ? (
-                   <div className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-white/10 bg-white/[0.01]">
-                     <Bell className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-                     <p className="text-[10px] text-muted-foreground">
-                       Select a boarding stop to activate arrival alerts.
-                     </p>
-                   </div>
-                 ) : (
-                   <div className="space-y-3">
-                     <div className={`flex items-center justify-between p-3 rounded-xl border ${
-                       isNotificationsEnabled
-                         ? 'border-emerald-500/20 bg-emerald-500/5'
-                         : 'border-white/10 bg-white/[0.02]'
-                     }`}>
-                       <div className="flex items-center gap-2.5">
-                         <span className="relative flex h-2 w-2">
-                           {isNotificationsEnabled && (
-                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                           )}
-                           <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                             isNotificationsEnabled ? 'bg-emerald-500' : 'bg-white/20'
-                           }`} />
-                         </span>
-                         <div>
-                           <p className="text-[10px] font-bold uppercase tracking-wider">
-                             {isNotificationsEnabled ? 'Monitoring' : 'Paused'}
-                           </p>
-                           <p className="text-[9px] text-muted-foreground truncate max-w-[140px]">
-                             {targetStop.name}
-                           </p>
-                         </div>
-                       </div>
-                       <button
-                         onClick={toggleAlerts}
-                         className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all ${
-                           isNotificationsEnabled
-                             ? 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'
-                             : 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20'
-                         }`}
-                       >
-                         {isNotificationsEnabled ? 'Pause' : 'Resume'}
-                       </button>
-                     </div>
-                     <p className="text-[9px] text-muted-foreground text-center">
-                       {isNotificationsEnabled
-                         ? "You'll be notified when a bus is within 500m"
-                         : "Tap Resume to authorize alerts"}
-                     </p>
-                   </div>
-                 )}
-               </CardContent>
-             </Card>
-
-             <Card className="border-white/5 glass-card">
-               <CardHeader className="py-3">
-                 <CardTitle className="text-sm flex items-center gap-2 font-display uppercase tracking-widest">
-                   <Star className="w-4 h-4 text-yellow-500" />
-                   Terminals
-                   {!isLoggedIn && <Lock className="w-3.5 h-3.5 text-white/30 ml-auto" />}
-                 </CardTitle>
-               </CardHeader>
-               <CardContent className="space-y-4 px-3 pb-3">
-                 {!isLoggedIn ? (
-                   <div className="flex flex-col items-center gap-3 py-4">
-                     <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                       <Lock className="w-4 h-4 text-white/30" />
-                     </div>
-                     <p className="text-[11px] text-white/40 text-center">Sign in to save favourite terminals</p>
-                     <button
-                       onClick={() => navigate("/login?portal=passenger")}
-                       className="text-[11px] font-bold text-primary hover:underline transition-all"
-                     >
-                       Sign In →
-                     </button>
-                   </div>
-                 ) : (
-                   routes.slice(0, 5).map((route, i) => {
-                     const terminal = route.stops[route.stops.length - 1];
-                     const closestActiveBus = liveBuses
-                       .filter(b => isActuallyActive(b, isDemoMode))
-                       .sort((a, b) =>
-                         calculateDistance(a.lat, a.lng, terminal.lat, terminal.lng) -
-                         calculateDistance(b.lat, b.lng, terminal.lat, terminal.lng)
-                       )[0];
- 
-                     return (
-                       <div 
-                         key={i} 
-                         onClick={() => setTargetStop(terminal)}
-                         className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:border-primary/20 transition-all cursor-pointer group"
-                       >
-                         <div className="flex flex-col">
-                           <span className="text-[11px] font-bold group-hover:text-primary transition-colors truncate max-w-[140px]">{terminal.name}</span>
-                           <span className="text-[9px] text-muted-foreground mt-0.5">
-                             {closestActiveBus ? calculateETAForTerminal(closestActiveBus, terminal) : '—'}
-                           </span>
-                         </div>
-                         <Star className={`w-3.5 h-3.5 transition-colors ${targetStop?.id === terminal.id ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground/30 group-hover:text-yellow-500'}`} />
-                       </div>
-                     );
-                   })
-                 )}
-               </CardContent>
-             </Card>
           </aside>
 
           <section className="flex-1 h-full min-h-0 relative overflow-hidden p-4">
@@ -866,11 +648,6 @@ export default function PassengerDashboard() {
                   if (stopRoute && selectedRoute === "all") setSelectedRoute(stopRoute.id);
                   toast.info(`Boarding Stop set to: ${stop.name}`);
                 }}
-                destinationStop={destinationStop}
-                onSelectDestinationStop={(stop) => {
-                  setDestinationStop(stop);
-                  toast.info(`Destination Stop set to: ${stop.name}`);
-                }}
               />
             </div>
 
@@ -880,9 +657,6 @@ export default function PassengerDashboard() {
                   <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">Trip Info</p>
                   <p className="mt-3 text-sm font-bold text-white leading-snug">
                     {targetStop ? targetStop.name : 'Boarding stop not selected'}
-                  </p>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    {destinationStop ? `Destination: ${destinationStop.name}` : 'Choose a destination in the sidebar or on the map'}
                   </p>
                 </div>
                 <div className="pointer-events-auto rounded-3xl border border-white/10 bg-black/45 p-5 backdrop-blur-xl text-white shadow-2xl">

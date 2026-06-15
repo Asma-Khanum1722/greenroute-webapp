@@ -4,7 +4,6 @@ import { Footer } from "@/components/Footer";
 import {
   MapPin,
   Clock,
-  Download,
   Bus,
   ArrowRight,
   Wallet,
@@ -42,12 +41,6 @@ const fares = [
   },
 ];
 
-const downloads = [
-  { name: "Project Proposal (Full Scope)", size: "0.2 MB", type: "PDF", url: "/Project-Proposal (Bus Tracking App).pdf" },
-  { name: "SRS - System Requirements", size: "0.4 MB", type: "PDF", url: "/SRS Document.pdf" },
-  { name: "SDS - Design Specifications", size: "9.8 MB", type: "PDF", url: "/SDS Document - Version 2.0 (Approved).pdf" },
-  { name: "Fleet Specifications Guide", size: "2.5 MB", type: "PDF", url: "#" },
-];
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -81,15 +74,14 @@ const RoutesSchedules = () => {
             <div className="inline-flex items-center gap-2 glass-card px-4 py-2 mb-6 border-primary/20">
               <Bus className="w-4 h-4 text-primary" />
               <span className="text-sm text-muted-foreground font-semibold uppercase tracking-widest">
-                8 Active Routes | 128 Official Stops
+                8 Active Routes | 128 Proposed Stops
               </span>
             </div>
             <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-foreground mb-4">
               Routes & Schedules
             </h1>
             <p className="text-lg text-muted-foreground">
-              Official transit information for the Sargodha Electric Bus Service. 
-              Launched 19 September 2025.
+              Proposed transit information based on the Sargodha Electric Bus Service initiative.
             </p>
           </motion.div>
         </div>
@@ -262,64 +254,6 @@ const RoutesSchedules = () => {
         </div>
       </section>
 
-      {/* Downloads Section */}
-      <section className="py-16 pb-24">
-        <div className="container mx-auto px-6">
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="font-display font-bold text-2xl sm:text-3xl text-foreground mb-12 flex items-center gap-4"
-          >
-            <span className="w-8 h-[2px] bg-primary"></span>
-            Downloads & Map
-          </motion.h2>
-
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="grid sm:grid-cols-2 gap-4"
-          >
-            {downloads.map((file) => (
-              <motion.div
-                key={file.name}
-                variants={itemVariants}
-                className="glass-card glass-card-hover p-5 flex items-center justify-between group border-white/5"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                    <span className="font-display font-bold text-[10px] text-primary">
-                      {file.type}
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-sm text-foreground">{file.name}</h4>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                      {file.size}
-                    </span>
-                  </div>
-                </div>
-                <a 
-                  href={file.url} 
-                  download 
-                  target="_blank" 
-                  rel="noreferrer"
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
-                  >
-                    <Download className="w-5 h-5" />
-                  </Button>
-                </a>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
 
       <Footer />
     </main>

@@ -2,11 +2,10 @@ import { motion } from "framer-motion";
 import { Leaf, Twitter, Instagram, Facebook } from "lucide-react";
 
 const footerLinks = {
-  navigation: ["Home", "Live Map", "Contact", "Privacy"],
-  socials: [
-    { icon: Twitter, href: "#" },
-    { icon: Instagram, href: "#" },
-    { icon: Facebook, href: "#" },
+  navigation: [
+    { name: "Home", href: "/" },
+    { name: "Live Map", href: "/passenger" },
+    { name: "Routes", href: "/routes" },
   ],
 };
 
@@ -35,8 +34,8 @@ export const Footer = () => {
               </span>
             </a>
             <p className="text-muted-foreground text-xs leading-relaxed max-w-xs">
-              Official Transit Partner of Sargodha City. Making public transport
-              reliable, one bus at a time.
+              A prototype transit portal based on the E-buses project initiated by 
+              Chief Minister Maryam Nawaz Sharif.
             </p>
           </motion.div>
 
@@ -52,40 +51,19 @@ export const Footer = () => {
             </h4>
             <ul className="grid grid-cols-2 gap-2">
               {footerLinks.navigation.map((link) => (
-                <li key={link}>
+                <li key={link.name}>
                   <a
-                    href={`#${link.toLowerCase().replace(" ", "-")}`}
+                    href={link.href}
                     className="text-muted-foreground hover:text-foreground transition-colors text-xs"
                   >
-                    {link}
+                    {link.name}
                   </a>
                 </li>
               ))}
             </ul>
           </motion.div>
 
-          {/* Social Links */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
-          >
-            <h4 className="font-display font-semibold text-foreground text-sm mb-3">
-              Follow Us
-            </h4>
-            <div className="flex gap-2">
-              {footerLinks.socials.map((social, index) => (
-                <a
-                  key={index}
-                  href={social.href}
-                  className="w-8 h-8 rounded-full glass-card flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/20 transition-all"
-                >
-                  <social.icon className="w-3.5 h-3.5" />
-                </a>
-              ))}
-            </div>
-          </motion.div>
+
 
           {/* Legal */}
           <motion.div
@@ -101,7 +79,7 @@ export const Footer = () => {
               © 2026 GreenRoute.
               <br />
               <span className="text-muted-foreground/40 italic">
-                Initiated by Maryam Nawaz Sharif Scheme
+                A Final Year Project Proposal
               </span>
             </p>
           </motion.div>

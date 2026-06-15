@@ -18,7 +18,7 @@ import AdminFleet from "@/pages/admin/AdminFleet";
 import AdminDrivers from "@/pages/admin/AdminDrivers";
 import AdminTelemetry from "@/pages/admin/AdminTelemetry";
 
-import { ChatWidget } from "@/components/ChatWidget";
+
 import { DemoProvider } from "@/lib/DemoContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -32,7 +32,7 @@ const App = () => (
         <Sonner />
         <DemoProvider>
           <BrowserRouter>
-            <ChatWidget />
+
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/routes" element={<RoutesSchedules />} />

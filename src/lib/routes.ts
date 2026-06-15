@@ -459,3 +459,62 @@ export const SCHEDULE = {
   frequencyMinutes: 60,
   days: "Daily (7 days a week)",
 };
+
+// OSRM ETA Cache to prevent duplicate requests and rate limiting
+let osrmCache: Record<string, { distanceKm: number, etaMinutes: number, timestamp: number }> = {};
+
+export const getOsrmETA = async (
+  busLat: number, 
+  busLng: number, 
+  targetLat: number, 
+  targetLng: number, 
+  fallbackSpeed: number
+): Promise<{ distanceKm: number, etaMinutes: number }> => {
+  const cacheKey = `${busLat.toFixed(3)},${busLng.toFixed(3)}-${targetLat.toFixed(3)},${targetLng.toFixed(3)}`;
+  const now = Date.now();
+  
+  // Return cached result if valid (within 30 seconds)
+  if (osrmCache[cacheKey] && (now - osrmCache[cacheKey].timestamp < 30000)) {
+    return {
+      distanceKm: osrmCache[cacheKey].distanceKm,
+      etaMinutes: osrmCache[cacheKey].etaMinutes
+    };
+  }
+
+  try {
+    // OSRM API expects longitude,latitude
+    const url = `https://router.project-osrm.org/route/v1/driving/${busLng},${busLat};${targetLng},${targetLat}?overview=false`;
+    
+    // Add a 3-second timeout so it doesn't hang the UI
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    const data = await res.json();
+    
+    if (data.code === "Ok" && data.routes && data.routes.length > 0) {
+      const distanceMeters = data.routes[0].distance;
+      const durationSeconds = data.routes[0].duration;
+      
+      const distanceKm = distanceMeters / 1000;
+      // Add traffic multiplier from our manual calculation to OSRM's free-flow estimate
+      const trafficMultiplier = getTrafficMultiplier();
+      const etaMinutes = Math.max(1, Math.round((durationSeconds / 60) * trafficMultiplier));
+      
+      osrmCache[cacheKey] = { distanceKm, etaMinutes, timestamp: now };
+      return { distanceKm, etaMinutes };
+    }
+  } catch (error) {
+    console.warn("OSRM fetch error, using fallback:", error);
+  }
+
+  // Fallback to Haversine straight-line if API fails or times out
+  const rawDist = calculateDistance(busLat, busLng, targetLat, targetLng);
+  // Assume a slightly slower city speed for straight-line to compensate for winding roads
+  const speed = fallbackSpeed > 10 ? fallbackSpeed : 25; 
+  const etaMinutes = Math.max(1, Math.round((rawDist / speed) * 60) * getTrafficMultiplier());
+  
+  return { distanceKm: rawDist, etaMinutes };
+};

@@ -1,10 +1,7 @@
 import { motion } from "framer-motion";
 
 const partners = [
-  { name: "Govt of Punjab", short: "GoP" },
-  { name: "Sargodha Transport Authority", short: "STA" },
   { name: "University of Sargodha", short: "UoS" },
-  { name: "City District Government", short: "CDG" },
 ];
 
 export const Partners = () => {

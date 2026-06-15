@@ -51,9 +51,7 @@ interface BusMapProps {
   className?: string;
   selectedRoute?: string;
   targetStop?: any;  // The stop selected by user
-  destinationStop?: any;
   onSelectStop?: (stop: any) => void;
-  onSelectDestinationStop?: (stop: any) => void;
   onBusesUpdate?: (buses: Bus[], calcETA: (bus: Bus, target?: { lat: number, lng: number }) => string) => void;
 }
 
@@ -91,9 +89,7 @@ const BusMap = ({
   showInactive = false, 
   selectedRoute = "all",
   targetStop = null,
-  destinationStop = null,
   onSelectStop,
-  onSelectDestinationStop,
   onBusesUpdate
 }: BusMapProps) => {
   const routes = useRoutes();
@@ -253,33 +249,13 @@ const BusMap = ({
           />
         ))}
 
-        {/* Selected Trip Path Highlight */}
-        {activeRoute && targetStop && destinationStop && (() => {
-          const idxA = activeRoute.stops ? activeRoute.stops.findIndex((s: any) => s.id === targetStop.id) : -1;
-          const idxB = activeRoute.stops ? activeRoute.stops.findIndex((s: any) => s.id === destinationStop.id) : -1;
-          if (idxA !== -1 && idxB !== -1 && activeRoute.stops) {
-            const min = Math.min(idxA, idxB);
-            const max = Math.max(idxA, idxB);
-            const pathStops = activeRoute.stops.slice(min, max + 1);
-            return (
-              <Polyline 
-                positions={pathStops.map((s: any) => [s.lat, s.lng] as [number, number])}
-                color="#3b82f6" // Electric blue path highlight
-                weight={7}
-                opacity={0.9}
-                dashArray="10, 10"
-              />
-            );
-          }
-          return null;
-        })()}
+
 
         {/* Route Stop Markers */}
         {selectedRoute === "all"
           ? routes.flatMap(route =>
               route.stops ? route.stops.map((stop) => {
                 const isBoarding = targetStop?.id === stop.id;
-                const isDestination = destinationStop?.id === stop.id;
                 
                 let iconHtml = `<div style="background-color: ${route.color}; width: 8px; height: 8px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); opacity: 0.7;"></div>`;
                 let iconSz: [number, number] = [8, 8];
@@ -290,17 +266,6 @@ const BusMap = ({
                     <div class="relative flex items-center justify-center w-6 h-6">
                       <div class="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-45"></div>
                       <div class="absolute inset-1 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-lg">
-                        <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
-                      </div>
-                    </div>
-                  `;
-                  iconSz = [24, 24];
-                  iconAnch = [12, 12];
-                } else if (isDestination) {
-                  iconHtml = `
-                    <div class="relative flex items-center justify-center w-6 h-6">
-                      <div class="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-45"></div>
-                      <div class="absolute inset-1 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center shadow-lg">
                         <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
                       </div>
                     </div>
@@ -347,26 +312,6 @@ const BusMap = ({
                               Set As Boarding Stop
                             </Button>
                           )}
-                          
-                          {isDestination ? (
-                            <Button 
-                              size="sm"
-                              variant="destructive"
-                              className="w-full h-8 text-[9px] uppercase font-bold"
-                              onClick={() => onSelectDestinationStop && onSelectDestinationStop(null)}
-                            >
-                              Remove Destination Stop
-                            </Button>
-                          ) : (
-                            <Button 
-                              size="sm"
-                              variant="outline"
-                              className="w-full h-8 text-[9px] uppercase font-bold border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-                              onClick={() => onSelectDestinationStop && onSelectDestinationStop(stop)}
-                            >
-                              Set As Destination
-                            </Button>
-                          )}
                         </div>
                       </div>
                     </Popup>
@@ -377,7 +322,6 @@ const BusMap = ({
           )
           : (activeRoute && activeRoute.stops ? activeRoute.stops.map((stop) => {
               const isBoarding = targetStop?.id === stop.id;
-              const isDestination = destinationStop?.id === stop.id;
               
               let iconHtml = `<div style="background-color: ${activeRoute.color}; width: 12px; height: 12px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`;
               let iconSz: [number, number] = [12, 12];
@@ -388,17 +332,6 @@ const BusMap = ({
                   <div class="relative flex items-center justify-center w-6 h-6">
                     <div class="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-45"></div>
                     <div class="absolute inset-1 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-lg">
-                      <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
-                    </div>
-                  </div>
-                `;
-                iconSz = [24, 24];
-                iconAnch = [12, 12];
-              } else if (isDestination) {
-                iconHtml = `
-                  <div class="relative flex items-center justify-center w-6 h-6">
-                    <div class="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-45"></div>
-                    <div class="absolute inset-1 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center shadow-lg">
                       <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
                     </div>
                   </div>
@@ -445,26 +378,6 @@ const BusMap = ({
                             onClick={() => onSelectStop && onSelectStop(stop)}
                           >
                             Set As Boarding Stop
-                          </Button>
-                        )}
-                        
-                        {isDestination ? (
-                          <Button 
-                            size="sm"
-                            variant="destructive"
-                            className="w-full h-8 text-[9px] uppercase font-bold"
-                            onClick={() => onSelectDestinationStop && onSelectDestinationStop(null)}
-                          >
-                            Remove Destination Stop
-                          </Button>
-                        ) : (
-                          <Button 
-                            size="sm"
-                            variant="outline"
-                            className="w-full h-8 text-[9px] uppercase font-bold border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-                            onClick={() => onSelectDestinationStop && onSelectDestinationStop(stop)}
-                          >
-                            Set As Destination
                           </Button>
                         )}
                       </div>
